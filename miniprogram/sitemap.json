@@ -1,0 +1,7 @@
+{
+  "desc": "FitFlow 小程序搜索索引配置，允许所有页面被微信搜索收录",
+  "rules": [{
+    "action": "allow",
+    "page": "*"
+  }]
+}

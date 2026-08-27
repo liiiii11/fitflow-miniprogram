@@ -1,0 +1,17 @@
+# 微信开发者工具本地私有配置（每台机器不同，含个人设置，勿提交）
+project.private.config.json
+
+# 依赖（云函数依赖走「云端安装依赖」，本地不提交）
+node_modules/
+miniprogram_npm/
+
+# 日志 / 系统缓存
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# 上传密钥（miniprogram-ci 私钥，必须保密，绝不能入库）
+private.*.key
+keys/
+*.pem

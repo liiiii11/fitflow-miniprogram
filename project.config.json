@@ -1,0 +1,18 @@
+{
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "appid": "wxee60c882737a7949",
+  "projectname": "fitflow",
+  "description": "FitFlow 健身追踪小程序版 - 云开发 + 智谱 GLM-4-Flash",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "newFeature": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "condition": {}
+}

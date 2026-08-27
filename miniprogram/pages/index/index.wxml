@@ -1,0 +1,534 @@
+<!-- pages/index/index.wxml - FitFlow 单页（完整还原原版 index.html 结构） -->
+<!-- 拖动排序时锁定页面滚动 -->
+<page-meta page-style="{{exDragIdx>=0 ? 'overflow: hidden;' : ''}}"/>
+<view class="app" style="padding-top:{{safeTop}}px">
+
+  <!-- TOP -->
+  <view class="top">
+    <view class="top__datewrap">
+      <text class="top__date">{{dateNum}}</text>
+      <text class="top__day">{{weekday}}</text>
+    </view>
+    <view class="top__nav">
+      <view class="top__navbtn" bindtap="openPlans">计划</view>
+      <view class="top__navbtn" bindtap="openProgress">进度</view>
+      <view class="top__navbtn" bindtap="openProfile">我的</view>
+    </view>
+  </view>
+
+  <!-- STATS -->
+  <view class="stats">
+    <view class="stat--accent" style="flex:1">
+      <view class="stat__num">{{intake}}</view>
+      <view class="stat__lbl">摄入/{{intakeGoal}}</view>
+      <view class="intake-bar"><view class="intake-bar__f" style="width:{{intakePct}}%"></view></view>
+    </view>
+    <view style="flex:1">
+      <view class="stat__num">{{burn}}</view>
+      <view class="stat__lbl">消耗 kcal</view>
+    </view>
+    <view style="flex:0.7" bindtap="changeWater" data-d="1">
+      <view class="stat__num">{{waterMl}}</view>
+      <view class="stat__lbl">饮水 ml</view>
+    </view>
+  </view>
+
+  <!-- MAIN: 训练 + 有氧 / 饮食（纵向排列，整页滚动；力量训练完整展开，饮食也完整显示） -->
+  <view class="main">
+    <view class="col">
+      <view class="col__block">
+        <view class="col__head">
+          <view style="display:flex;align-items:center">
+            <view class="col__title col__title--plan" bindtap="openPlans">{{planTitle}}</view>
+            <view class="day-switch {{dayLocked?'locked':''}}" bindtap="switchDay" data-d="1">
+              <text class="day-switch__label">{{planLabel}}</text>
+              <text class="day-switch__arrow">▾</text>
+            </view>
+          </view>
+          <view class="col__add" bindtap="openExModal">+</view>
+        </view>
+        <view class="col__list">
+          <view wx:if="{{exList.length===0}}" class="empty">暂无训练动作，点击 + 添加</view>
+          <view wx:for="{{exList}}" wx:key="k"
+                class="item item--train ex-item {{exDragIdx===item.i?'dragging':''}} {{item.tf||item.s||(exDragIdx>=0&&exDragIdx!==item.i)?'tf-shift':''}}"
+                style="{{exDragIdx===item.i ? 'transform:translateY(' + exDragY + 'px);' : (item.tf||item.hold||'')}}"
+                bindtap="showExDetail" data-i="{{item.i}}"
+                bindlongpress="onExDragStart" data-i="{{item.i}}"
+                bindtouchmove="onExDragMove" bindtouchend="onExDragEnd" bindtouchcancel="onExDragEnd">
+            <view class="item__main">
+              <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
+              <text wx:if="{{item.meta}}" class="item__meta">{{item.meta}}</text>
+            </view>
+            <view class="item__del" catchtap="confirmDelEx" data-i="{{item.i}}">删除</view>
+            <view class="item__check {{item.done?'done':''}}" catchtap="toggleEx" data-i="{{item.i}}"></view>
+          </view>
+        </view>
+      </view>
+      <view class="col__block" style="border-top:1px solid var(--rule)">
+        <view class="col__head"><text class="col__title">有氧</text><view class="col__add" bindtap="openCardioModal">+</view></view>
+        <view class="col__list">
+          <view wx:if="{{cardioList.length===0}}" class="empty">暂无有氧训练，点击 + 添加</view>
+          <view wx:for="{{cardioList}}" wx:key="i" class="item item--train" bindtap="showCardioDetail" data-i="{{item.i}}">
+            <view class="item__main">
+              <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
+              <text wx:if="{{item.meta}}" class="item__meta">{{item.meta}}</text>
+            </view>
+            <view class="item__del" catchtap="confirmDelCardio" data-i="{{item.i}}">删除</view>
+            <view class="item__check {{item.done?'done':''}}" catchtap="toggleCardio" data-i="{{item.i}}"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 饮食 + 补剂 -->
+    <view class="col col--diet">
+      <view class="col__block">
+        <view class="col__head"><text class="col__title">饮食</text><view class="col__add" bindtap="openFoodModal">+</view></view>
+        <view class="col__list">
+          <view wx:for="{{mealList}}" wx:key="type" class="item meal-item" bindtap="showMealDetail" data-type="{{item.type}}">
+            <text class="item__name">{{item.name}}</text>
+            <text class="item__meta">{{item.empty?'0 kcal':item.total+' kcal'}}</text>
+          </view>
+        </view>
+      </view>
+      <!-- SUPPS: 补剂（不计热量，勾选每日重置） -->
+      <view class="col__block supp-block">
+        <view class="col__head">
+          <text class="col__title">补剂</text>
+          <view class="col__add" bindtap="openSuppModal">+</view>
+        </view>
+        <view class="col__list">
+          <view wx:if="{{suppList.length===0}}" class="empty">暂无补剂，点击 + 添加</view>
+          <view wx:for="{{suppList}}" wx:key="k" class="item supp-item">
+            <view class="item__main">
+              <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
+              <text class="item__meta">{{item.dose}}</text>
+            </view>
+            <view class="item__del" catchtap="confirmDelSupp" data-i="{{item.i}}">删除</view>
+            <view class="item__check {{item.done?'done':''}}" catchtap="toggleSupp" data-i="{{item.i}}"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- WATER -->
+  <view class="water">
+    <view class="water__btn" bindtap="changeWater" data-d="-1">−</view>
+    <view class="water__mid">
+      <view class="water__val">{{waterMl}}</view>
+      <view class="water__goal">ml / {{waterGoal}}</view>
+      <view class="water__bar"><view class="water__bar-f" style="width:{{waterPct}}%"></view></view>
+    </view>
+    <view class="water__btn" bindtap="changeWater" data-d="1">+</view>
+  </view>
+
+</view>
+
+<!-- ==================== 全屏页（进度 / 我的 / 计划 / 计划详情 / 计划编辑器） ==================== -->
+
+<!-- PROGRESS -->
+<view wx:if="{{pageOverlay==='progress' || pageLeaving==='progress' || pageUnder==='progress'}}" class="ov-page {{pageLeaving==='progress' ? 'ov-page--out' : (pageUnder==='progress' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="backHome">← 返回</view>
+  <view class="pg-title">进度</view>
+  <view style="margin-bottom:20px">
+    <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <view style="display:flex;align-items:center;gap:8px">
+        <view class="heat-nav" bindtap="heatPrevMonth">←</view>
+        <text style="font-size:12px;font-weight:600;min-width:110px;text-align:center">{{heatmapMonthLabel}}</text>
+        <view class="heat-nav" bindtap="heatNextMonth">→</view>
+      </view>
+      <text style="font-size:10px;color:var(--muted)">{{heatmapDaysLabel}}</text>
+    </view>
+    <view class="heatmap">
+      <view wx:for="{{heatmap}}" wx:key="index"
+        class="heat-cell {{item.isToday?'today':''}} {{item.disabled?'disabled':''}}"
+        style="background:{{item.color}}"
+        bindtap="showHeatDetail" data-ds="{{item.dateStr}}">{{item.day}}</view>
+    </view>
+    <view class="heat-legend">
+      <text style="margin-right:auto">当月对比</text>
+      <text>少</text>
+      <view class="heat-sq" style="background:#E8E5DF"></view>
+      <view class="heat-sq" style="background:#ECD5CC"></view>
+      <view class="heat-sq" style="background:#DEAA98"></view>
+      <view class="heat-sq" style="background:#D07F64"></view>
+      <view class="heat-sq" style="background:#D4785C"></view>
+      <text>多</text>
+    </view>
+  </view>
+  <!-- 训练长进 -->
+  <view class="pg-box">
+    <view class="pg-box__head">
+      <text class="pg-box__title">训练长进</text>
+      <view wx:if="{{growthHasRefresh}}" class="pg-box__refresh {{growthLoading?'loading':''}}" bindtap="analyzeGrowth" data-force="1">↻</view>
+    </view>
+    <view class="pg-growth-text">{{growthText}}</view>
+    <view class="growth-bars">
+      <view wx:for="{{growthBars}}" wx:key="index" class="growth-bar-col">
+        <view style="font-size:9px;font-weight:600;color:{{item.textColor}}">{{item.count||''}}</view>
+        <view class="growth-bar" style="height:{{item.h}}%;background:{{item.color}};{{item.dim?'opacity:.3;':''}}"></view>
+        <view style="display:flex;flex-direction:column;align-items:center;line-height:1.25">
+          <text style="font-size:8px;color:{{item.textColor}}">{{item.label}}</text>
+          <text style="font-size:8px;color:{{item.textColor}}">{{item.end}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="heat-legend"><text>近 8 周对比</text><text style="margin-left:auto">少</text><view class="heat-sq" style="background:#E8E5DF"></view><view class="heat-sq" style="background:#ECD5CC"></view><view class="heat-sq" style="background:#DEAA98"></view><view class="heat-sq" style="background:#D07F64"></view><view class="heat-sq" style="background:#D4785C"></view><text>多</text></view>
+  </view>
+  <view class="pg-row"><text>本周训练</text><text class="pg-row__num pg-row__num--accent">{{weekTrain}}</text></view>
+  <view class="pg-row"><text>本月训练</text><text class="pg-row__num">{{monthTrain}}</text></view>
+  <view class="pg-row"><text>连续打卡</text><text class="pg-row__num">{{streakDays}}</text></view>
+  <view class="pg-row"><text>累计训练</text><text class="pg-row__num">{{totalTrain}}</text></view>
+</view>
+
+<!-- PROFILE -->
+<view wx:if="{{pageOverlay==='profile' || pageLeaving==='profile' || pageUnder==='profile'}}" class="ov-page {{pageLeaving==='profile' ? 'ov-page--out' : (pageUnder==='profile' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="backHome">← 返回</view>
+  <view class="sec-title">目标体重</view>
+  <view style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+    <input class="fg__inp fg__inp--lg" type="digit" value="{{goalWeightInput}}" bindinput="onGoalWeightInput" style="width:120px"/>
+    <text style="font-size:16px;color:var(--muted)">kg</text>
+    <button class="btn btn--pri btn--sm" style="margin-left:auto" bindtap="saveGoalWeight">设置</button>
+  </view>
+  <view style="font-size:12px;color:var(--muted);margin-bottom:24px">{{goalWeightHint}}</view>
+
+  <view class="sec-title">饮水目标</view>
+  <view style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px">
+    <input class="fg__inp fg__inp--md" type="number" value="{{waterGoalInput}}" bindinput="onWaterGoalInput" style="width:100px"/>
+    <text style="font-size:14px;color:var(--muted)">ml/天</text>
+    <button class="btn btn--pri btn--sm" style="margin-left:auto" bindtap="saveWaterGoal">设置</button>
+  </view>
+
+  <view class="sec-title">身体数据 <text style="font-size:11px;color:var(--text);font-weight:400;margin-left:8px" bindtap="openModal" data-type="metric">+ 记录</text></view>
+  <view style="font-size:11px;color:var(--accent);font-weight:500;margin:2px 0 10px;text-decoration:underline;text-underline-offset:3px" bindtap="openMetricChart">曲线</view>
+  <view class="pg-row"><text>体重</text><text><text style="font-size:16px;font-weight:600">{{weightVal}}</text> kg <text style="font-size:11px;color:var(--accent)">{{weightDiff}}</text></text></view>
+  <view class="pg-row"><text>体脂率</text><text><text style="font-size:16px;font-weight:600">{{bodyFatVal}}</text>% <text style="font-size:11px;color:var(--accent)">{{bodyFatDiff}}</text></text></view>
+
+  <view class="sec-title" style="margin-top:24px">数据管理</view>
+  <button class="btn btn--fw btn--danger" bindtap="resetAllData">清空所有数据</button>
+</view>
+
+<!-- PLANS -->
+<view wx:if="{{pageOverlay==='plans' || pageLeaving==='plans' || pageUnder==='plans'}}" class="ov-page {{pageLeaving==='plans' ? 'ov-page--out' : (pageUnder==='plans' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="backHome">← 返回</view>
+  <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <text style="font-size:20px;font-weight:600">训练计划</text>
+    <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="openPlanEditor">+ 新建</text>
+  </view>
+  <view wx:for="{{planList}}" wx:key="id" class="plan-card" bindtap="showPlanDetail" data-id="{{item.id}}">
+    <view style="display:flex;align-items:center;justify-content:space-between">
+      <text style="font-weight:600;font-size:15px">{{item.name}}</text>
+      <text wx:if="{{item.current}}" style="font-size:10px;color:var(--accent);font-weight:500">使用中</text>
+    </view>
+    <view style="font-size:12px;color:var(--muted);margin-top:4px">{{item.desc}}</view>
+    <view wx:if="{{item.tags.length}}" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+      <text wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" style="font-size:11px;color:var(--muted);background:var(--rule);padding:2px 8px;border-radius:4px">{{tag}}</text>
+    </view>
+  </view>
+</view>
+
+<!-- PLAN DETAIL -->
+<view wx:if="{{pageOverlay==='planDetail' || pageLeaving==='planDetail' || pageUnder==='planDetail'}}" class="ov-page {{pageLeaving==='planDetail' ? 'ov-page--out' : (pageUnder==='planDetail' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="backFromPlanDetail">← 返回</view>
+  <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <text style="font-size:20px;font-weight:600">{{planDetailName}}</text>
+    <text style="font-size:18px;color:var(--text);font-weight:500" bindtap="editPlanFromDetail">编辑</text>
+  </view>
+  <view style="font-size:12px;color:var(--muted);margin-bottom:20px">{{planDetailDesc}}</view>
+  <view wx:if="{{!planDetailDays.length}}" style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px">暂无训练日</view>
+  <view wx:for="{{planDetailDays}}" wx:key="index" style="margin-bottom:20px">
+    <view style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--rule);margin-bottom:8px">
+      <text style="font-size:14px;font-weight:600">{{item.name}}</text>
+      <text style="font-size:11px;color:var(--muted)">{{item.count}} 个动作</text>
+    </view>
+    <view wx:if="{{item.exs.length===0}}" style="padding:8px 0;color:var(--muted);font-size:12px">暂无动作</view>
+    <view wx:for="{{item.exs}}" wx:for-item="ex" wx:key="index" style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
+      <text style="font-size:14px">{{ex.name}}</text>
+      <text style="font-size:12px;color:var(--muted)">{{ex.meta}}</text>
+    </view>
+  </view>
+  <view style="display:flex;gap:12px;margin-top:24px">
+    <button wx:if="{{planDetailDeleteShow}}" class="btn btn--del" style="flex:1" bindtap="deletePlanFromDetail">删除计划</button>
+    <button class="btn btn--pri btn--fw {{planDetailApplyDisabled?'disabled':''}}" style="flex:2" bindtap="applyPlanFromDetail">{{planDetailApplyText}}</button>
+  </view>
+</view>
+
+<!-- PLAN EDITOR -->
+<view wx:if="{{pageOverlay==='planEditor' || pageLeaving==='planEditor' || pageUnder==='planEditor'}}" class="ov-page {{pageLeaving==='planEditor' ? 'ov-page--out' : (pageUnder==='planEditor' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="cancelPlanEditor">← 返回</view>
+  <view style="font-size:20px;font-weight:600;margin-bottom:20px">{{planEditorTitle}}</view>
+  <view class="fg"><text class="fg__lbl">计划名称</text><input class="fg__inp" placeholder="输入计划名" value="{{planName}}" bindinput="onPlanName" style="width:100%"/></view>
+  <view class="sec-title" style="margin:16px 0 8px">训练日</view>
+  <view wx:if="{{planDaysView.length===0}}" style="padding:16px 0;text-align:center;color:var(--muted);font-size:12px">暂无训练日，在下方输入名称添加</view>
+  <view wx:for="{{planDaysView}}" wx:key="i" style="padding:12px 0;border-bottom:1px solid var(--rule)">
+    <view style="display:flex;align-items:center;justify-content:space-between">
+      <text style="font-size:14px;font-weight:600">{{item.name}}</text>
+      <view style="display:flex;align-items:center;gap:10px">
+        <text style="font-size:12px;color:var(--muted)">{{item.count}} 个动作</text>
+        <text style="font-size:12px;color:var(--text);font-weight:500" bindtap="openDayEditor" data-i="{{item.i}}">编辑动作</text>
+        <text style="font-size:12px;color:var(--danger)" bindtap="removeEditorDay" data-i="{{item.i}}">删除</text>
+      </view>
+    </view>
+    <view style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.exNames}}</view>
+  </view>
+  <view style="display:flex;gap:8px;margin-top:12px;align-items:center">
+    <input class="fg__inp" placeholder="训练日名称（如：推日）" value="{{newDayName}}" bindinput="onNewDayName" style="flex:1;font-size:15px"/>
+    <button class="btn btn--pri btn--sm" style="flex-shrink:0" bindtap="addPlanDayInline">添加</button>
+  </view>
+  <view style="display:flex;gap:12px;margin-top:32px">
+    <button class="btn btn--ghost" style="flex:1" bindtap="cancelPlanEditor">取消</button>
+    <button class="btn btn--pri btn--fw" style="flex:2" bindtap="savePlan">保存计划</button>
+  </view>
+</view>
+
+<!-- ==================== 底部弹窗（overlay） ==================== -->
+
+<!-- 添加训练 -->
+<view wx:if="{{modalOverlay==='ex'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">添加训练</view>
+    <view class="fg"><text class="fg__lbl">动作</text><input class="fg__inp" placeholder="动作名称" value="{{exName}}" bindinput="onExNameInput" cursor-spacing="120"/></view>
+    <view class="fg__row" style="margin-top:14px">
+      <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exWt}}" bindinput="onExWt" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSets}}" bindinput="onExSets" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{exReps}}" bindinput="onExReps" cursor-spacing="120"/></view>
+    </view>
+    <view style="font-size:11px;color:var(--muted);margin-top:4px">三项均可留空，稍后也可点击主页动作名修改</view>
+    <view style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="cancelEx">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="addEx">确认</button>
+    </view>
+  </view>
+</view>
+
+<!-- 添加有氧 -->
+<view wx:if="{{modalOverlay==='cardio'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">添加有氧</view>
+    <view class="fg"><text class="fg__lbl">项目名称</text><input class="fg__inp" placeholder="如：跑步、游泳" value="{{coName}}" bindinput="onCoName" cursor-spacing="120"/></view>
+    <view class="fg__row">
+      <view class="fg"><text class="fg__lbl">时长(分)</text><input class="fg__inp" type="number" value="{{coDur}}" bindinput="onCoDur" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">消耗(kcal)</text><input class="fg__inp" type="number" value="{{coBurn}}" bindinput="onCoBurn" cursor-spacing="120"/></view>
+    </view>
+    <view style="font-size:10px;color:var(--muted);margin-top:6px">{{coCalHint}}</view>
+    <view style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="cancelCardio">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="addCardio">确认</button>
+    </view>
+  </view>
+</view>
+
+<!-- 添加补剂 -->
+<view wx:if="{{modalOverlay==='supp'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">添加补剂</view>
+    <view class="fg"><text class="fg__lbl">名称</text><input class="fg__inp" placeholder="如：蛋白粉、肌酸、鱼油" value="{{suppName}}" bindinput="onSuppName" cursor-spacing="120"/></view>
+    <view class="fg__row" style="margin-top:14px">
+      <view class="fg"><text class="fg__lbl">剂量</text><input class="fg__inp" type="digit" placeholder="如 30" value="{{suppDose}}" bindinput="onSuppDose" cursor-spacing="120"/></view>
+    </view>
+    <view style="margin-top:14px">
+      <text class="fg__lbl">单位</text>
+      <view class="meal-type-sel" style="margin-top:8px;margin-bottom:0">
+        <view class="meal-type {{suppUnit==='ml'?'on':''}}" bindtap="selectSuppUnit" data-u="ml">毫升 (ml)</view>
+        <view class="meal-type {{suppUnit==='pill'?'on':''}}" bindtap="selectSuppUnit" data-u="pill">颗</view>
+      </view>
+    </view>
+    <view style="font-size:11px;color:var(--muted);margin-top:10px">补剂不计入热量；勾选状态每天自动重置</view>
+    <view style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="cancelSupp">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="addSupp">确认</button>
+    </view>
+  </view>
+</view>
+
+<!-- 删除确认 -->
+<view wx:if="{{modalOverlay==='confirmDel'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view class="sheet__title">删除动作</view>
+    <view style="text-align:center;font-size:14px;line-height:1.6;padding:12px 0 4px;color:var(--text)">{{confirmDelText}}</view>
+    <view style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
+      <button class="btn btn--fw btn--danger-solid" style="flex:2" bindtap="doDelConfirm">删除</button>
+    </view>
+  </view>
+</view>
+
+<!-- 动作设置（重量/次数） -->
+<view wx:if="{{modalOverlay==='exDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">{{exDetailTitle}}</view>
+    <view class="fg__row">
+      <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exSetWt}}" bindinput="onExSetWt" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSetSets}}" bindinput="onExSetSets" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{exSetReps}}" bindinput="onExSetReps" cursor-spacing="120"/></view>
+    </view>
+    <view style="font-size:11px;color:var(--muted);margin-top:4px">填写今天的实际重量、组数和每组次数；换训练日后需重新填写</view>
+    <view style="font-size:13px;font-weight:600;color:var(--accent);margin-top:14px">{{exDetailBurn}}</view>
+    <view style="display:flex;gap:12px;margin-top:22px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="saveExMeta">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- 有氧设置（时长/消耗） -->
+<view wx:if="{{modalOverlay==='cardioDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">{{coDetailTitle}}</view>
+    <view class="fg__row">
+      <view class="fg"><text class="fg__lbl">时长 (分钟)</text><input class="fg__inp" type="digit" placeholder="如 30" value="{{coDetailDur}}" bindinput="onCoDetailDur" cursor-spacing="120"/></view>
+      <view class="fg"><text class="fg__lbl">消耗 (kcal)</text><input class="fg__inp" type="digit" placeholder="如 240" value="{{coDetailBurn}}" bindinput="onCoDetailBurn" cursor-spacing="120"/></view>
+    </view>
+    <view style="font-size:11px;color:var(--muted);margin-top:4px">修改时长后消耗按 MET 自动重算，也可手动修改</view>
+    <view style="font-size:13px;font-weight:600;color:var(--accent);margin-top:14px">{{coDetailCalHint}}</view>
+    <view style="display:flex;gap:12px;margin-top:22px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="saveCardioMeta">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- 热度详情 -->
+<view wx:if="{{modalOverlay==='heatDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view class="sheet__title">{{heatDetailTitle}}</view>
+    <view style="font-size:14px;line-height:1.7;color:var(--text);padding:4px 0">
+      <view wx:for="{{heatDetailBody}}" wx:key="index" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule)">
+        <text wx:if="{{item.head}}" style="color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;flex:1">{{item.label}}</text>
+        <block wx:else>
+          <text wx:if="{{item.ex}}" style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
+          <text wx:if="{{item.label && !item.ex}}" style="color:var(--muted)">{{item.label}}</text>
+          <text style="{{item.muted?'color:var(--muted);margin-left:auto':''}} {{item.ex?'margin-left:8px':''}}">{{item.text}}</text>
+        </block>
+      </view>
+    </view>
+    <view style="display:flex;gap:12px;margin-top:20px">
+      <button class="btn btn--pri btn--fw" style="flex:1" bindtap="closeOverlay">关闭</button>
+    </view>
+  </view>
+</view>
+
+<!-- 添加食物 -->
+<view wx:if="{{modalOverlay==='food'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}} ov-sheet--food" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">添加食物</view>
+    <view class="meal-type-sel">
+      <view wx:for="{{mealTypeSel}}" wx:key="type" class="meal-type {{item.on?'on':''}}" bindtap="selectMealType" data-type="{{item.type}}">{{item.name}}</view>
+    </view>
+    <scroll-view scroll-y class="sheet__scroll" enhanced show-scrollbar="{{false}}">
+      <view class="manual-box">
+        <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <text class="fg__lbl" style="margin-bottom:0">手动添加</text>
+          <text class="ai-badge">{{aiStatus}}</text>
+        </view>
+        <view style="display:flex;gap:8px;align-items:flex-end">
+          <view style="flex:1"><input class="fg__inp" placeholder="食物名称（如：鸡胸肉）" value="{{manualFoodName}}" bindinput="onManualFoodInput" style="font-size:15px" cursor-spacing="100"/></view>
+          <text class="manual-match {{manualFoodMatchCls}}">{{manualFoodMatch}}</text>
+        </view>
+        <view wx:if="{{manualFoodCalWrap}}" style="display:flex;margin-top:10px;align-items:flex-end;gap:8px">
+          <view style="flex:1"><input class="fg__inp" type="number" placeholder="热量（kcal）" value="{{manualFoodCal}}" bindinput="onManualFoodCal" style="font-size:15px" cursor-spacing="100"/></view>
+          <text style="font-size:12px;color:var(--muted);padding-bottom:10px">kcal</text>
+          <text style="font-size:11px;color:var(--danger);padding-bottom:10px;white-space:nowrap">未查到，手动填写</text>
+        </view>
+        <view style="font-size:11px;color:var(--muted);margin-top:10px">💡 本地库和网络都查不到时，自动用免费 AI 查热量</view>
+      </view>
+      <text class="food-cat">快捷选择</text>
+      <view style="font-size:12px;color:var(--muted);margin-bottom:4px;min-height:16px">{{foodPickSummary}}</view>
+      <view wx:for="{{foodPickList}}" wx:key="cat" wx:for-item="group" wx:for-index="gi">
+        <text class="food-cat">{{group.cat}}</text>
+        <view wx:for="{{group.items}}" wx:for-item="food" wx:key="name" wx:for-index="fi"
+          class="meal-row {{food.picked?'picked':''}}"
+          bindtap="toggleFoodPick" data-ci="{{gi}}" data-ii="{{fi}}">
+          <text>{{food.name}}</text>
+          <text class="meal-row__cals">{{food.cal}} kcal</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="sheet__foot">
+      <button class="btn btn--ghost" style="flex:1" bindtap="cancelFood">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="confirmAddFood">确认添加</button>
+    </view>
+  </view>
+</view>
+
+<!-- 身体数据 -->
+<view wx:if="{{modalOverlay==='metric'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">身体数据</view>
+    <view class="fg"><text class="fg__lbl">体重 (kg)</text><input class="fg__inp" type="digit" placeholder="如 72.5" value="{{mWeight}}" bindinput="onMWeight" cursor-spacing="120"/></view>
+    <view class="fg"><text class="fg__lbl">体脂率 (%)</text><input class="fg__inp" type="digit" placeholder="如 16.8" value="{{mBodyFat}}" bindinput="onMBodyFat" cursor-spacing="120"/></view>
+    <view style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="saveMetric">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- 记录曲线 -->
+<view wx:if="{{modalOverlay==='metricChart'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <view class="sheet__title" style="margin-bottom:0">记录曲线</view>
+      <text style="font-size:24px;color:var(--muted);line-height:1;padding:4px" bindtap="closeOverlay">×</text>
+    </view>
+    <view class="mc-row" style="display:flex;gap:8px;margin-bottom:14px">
+      <view class="mc-tab {{metricChartType==='weight'?'on':''}}" bindtap="setMetricChart" data-f="weight">体重</view>
+      <view class="mc-tab {{metricChartType==='bodyFat'?'on':''}}" bindtap="setMetricChart" data-f="bodyFat">体脂率</view>
+    </view>
+    <canvas type="2d" id="metricChart" style="width:320px;height:190px;display:block"></canvas>
+    <view style="font-size:11px;color:var(--muted);margin-top:10px">{{metricChartInfo}}</view>
+  </view>
+</view>
+
+<!-- 餐次详情 -->
+<view wx:if="{{modalOverlay==='meal'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view class="sheet__title">{{mealDetailTitle}}</view>
+    <view wx:if="{{mealDetailItems.length===0}}" style="text-align:center;padding:32px 0;color:var(--muted);font-size:14px">还没有记录，点击下方「添加食物」</view>
+    <block wx:else>
+      <view wx:for="{{mealDetailItems}}" wx:key="idx" style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--rule)">
+        <view>
+          <view style="font-size:15px">{{item.name}}</view>
+          <view wx:if="{{item.sub}}" style="font-size:12px;color:var(--muted);margin-top:2px">{{item.sub}}</view>
+        </view>
+        <view style="display:flex;align-items:center;gap:10px">
+          <text style="font-size:14px;font-weight:600;color:var(--accent)">{{item.cal}} kcal</text>
+          <text style="font-size:12px;color:var(--danger)" bindtap="delMealItem" data-i="{{item.idx}}">删除</text>
+        </view>
+      </view>
+      <view style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;font-weight:600"><text>合计</text><text style="font-size:14px">{{mealDetailTotal}} kcal</text></view>
+    </block>
+    <view class="sheet__foot">
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeMealDetail">关闭</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="addFoodFromMeal">添加食物</button>
+    </view>
+  </view>
+</view>
+
+<!-- 训练日动作编辑 -->
+<view wx:if="{{modalOverlay==='dayEditor'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
+    <view class="sheet__title">{{dayEditorTitle}}</view>
+    <view style="margin-bottom:16px">
+      <view wx:if="{{dayExList.length===0}}" style="text-align:center;padding:16px 0;color:var(--muted);font-size:13px">暂无动作，在下方添加</view>
+      <view wx:for="{{dayExList}}" wx:key="i" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--rule)">
+        <view>
+          <view style="font-size:14px">{{item.name}}</view>
+          <view wx:if="{{item.meta}}" style="font-size:11px;color:var(--muted);margin-top:2px">{{item.meta}}</view>
+        </view>
+        <text style="font-size:12px;color:var(--danger)" bindtap="removeEditorDayEx" data-i="{{item.i}}">删除</text>
+      </view>
+    </view>
+    <view style="border-top:1px solid var(--rule);padding-top:16px">
+      <view style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px">添加动作</view>
+      <view class="fg"><text class="fg__lbl">动作名称</text><input class="fg__inp" placeholder="如：杠铃卧推" value="{{dayExName}}" bindinput="onDayExName" cursor-spacing="120"/></view>
+      <view style="font-size:11px;color:var(--muted);margin-top:4px">只填动作名；重量、组数和次数每天训练时在主页点击动作名填写</view>
+      <button class="btn btn--fw btn--ghost" style="margin-top:8px" bindtap="addExToEditorDay">+ 添加动作</button>
+    </view>
+    <button class="btn btn--pri btn--fw" style="margin-top:16px" bindtap="closeDayEditor">完成</button>
+  </view>
+</view>
+
+<!-- TOAST -->
+<view class="toast {{toastShow?'show':''}}">{{toast}}</view>
