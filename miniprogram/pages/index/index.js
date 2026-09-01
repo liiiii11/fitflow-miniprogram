@@ -875,6 +875,11 @@ Page({
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (!plan || !plan.days || plan.days.length === 0) return;
     if (plan.days.length === 1) { this.toast('当前计划只有 1 个训练日'); return; }
+    // 当天已勾选过动作 → 锁定当前训练日，防止已勾选数据与消耗归属错乱
+    if (this.getCurrentExercises().some(e => e.done)) {
+      this.toast('今天已完成训练，训练日已锁定，明天自动切换');
+      return;
+    }
     this.state.currentDayIdx = (this.state.currentDayIdx + delta + plan.days.length) % plan.days.length;
     this.saveState();
     this.renderExList();
