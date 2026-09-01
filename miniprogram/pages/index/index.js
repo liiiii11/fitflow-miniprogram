@@ -868,7 +868,10 @@ Page({
 
   // ==================== DAY SWITCHER ====================
   switchDay(e) {
-    const delta = e.currentTarget.dataset.d;
+    // dataset 值一定是字符串，必须转数字，否则「idx + delta」变成字符串拼接
+    // （如 idx=1, delta="1" → "11" % 4 = 3），导致多日计划从第 2 天起切换失效
+    const delta = parseInt(e.currentTarget.dataset.d, 10);
+    if (!isFinite(delta) || delta === 0) return;
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (!plan || !plan.days || plan.days.length === 0) return;
     if (plan.days.length === 1) { this.toast('当前计划只有 1 个训练日'); return; }
