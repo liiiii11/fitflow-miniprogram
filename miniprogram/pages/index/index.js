@@ -243,11 +243,12 @@ Page({
       this.state.history[today] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
     }
     const h = this.state.history[today];
-    const exs = this.getCompletedExercises();
-    const completedExs = exs;
-    h.trained = completedExs.length > 0 ? 1 : 0;
-    h.burn = this.estimateBurn(completedExs) + this.getCardioBurn();
+    const completedExs = this.getCompletedExercises();
     const doneCardio = (this.state.cardio || []).filter(c => c.done);
+    // 只做有氧（未做力量）也必须记为训练日：trained 只看力量动作会导致
+    // 有氧日的热力图/周月统计/连续天数/成长分析全部漏记
+    h.trained = (completedExs.length > 0 || doneCardio.length > 0) ? 1 : 0;
+    h.burn = this.estimateBurn(completedExs) + this.getCardioBurn();
     h.exNames = completedExs.map(e => e.name).concat(doneCardio.map(c => c.name));
     h.exMeta = completedExs.map(e => e.meta || '').concat(doneCardio.map(c => c.meta || ''));
     h.intake = this.getTotalIntake();
@@ -583,6 +584,13 @@ Page({
   onExDragEnd() {
     if (this.data.exDragIdx < 0) return;
     const p = this._dragPos;
+    // 异常防御：拖动中列表被刷新导致找不到原始槽位时，直接复位拖动态，
+    // 避免 splice(-1, 1) 误删列表最后一项
+    if (p == null || p < 0) {
+      this._dragHeights = null;
+      this.setData({ exDragIdx: -1, exDragY: 0 });
+      return;
+    }
     const slot = (this._dragSlot == null || this._dragSlot < 0) ? p : this._dragSlot;
     const dy = this.data.exDragY || 0;
     const hs = (this._dragHeights || []).slice();
