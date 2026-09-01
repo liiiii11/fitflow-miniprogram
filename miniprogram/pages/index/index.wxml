@@ -33,7 +33,7 @@
     </view>
   </view>
 
-  <!-- MAIN: 训练 + 有氧 / 饮食（纵向排列，整页滚动；力量训练完整展开，饮食也完整显示） -->
+  <!-- MAIN: 训练 + 补剂 / 饮食 + 有氧（纵向排列，整页滚动；力量训练完整展开，饮食也完整显示） -->
   <view class="main">
     <view class="col">
       <view class="col__block">
@@ -64,33 +64,6 @@
           </view>
         </view>
       </view>
-      <view class="col__block" style="border-top:1px solid var(--rule)">
-        <view class="col__head"><text class="col__title">有氧</text><view class="col__add" bindtap="openCardioModal">+</view></view>
-        <view class="col__list">
-          <view wx:if="{{cardioList.length===0}}" class="empty">暂无有氧训练，点击 + 添加</view>
-          <view wx:for="{{cardioList}}" wx:key="i" class="item item--train" bindtap="showCardioDetail" data-i="{{item.i}}">
-            <view class="item__main">
-              <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
-              <text wx:if="{{item.meta}}" class="item__meta">{{item.meta}}</text>
-            </view>
-            <view class="item__del" catchtap="confirmDelCardio" data-i="{{item.i}}">删除</view>
-            <view class="item__check {{item.done?'done':''}}" catchtap="toggleCardio" data-i="{{item.i}}"></view>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 饮食 + 补剂 -->
-    <view class="col col--diet">
-      <view class="col__block">
-        <view class="col__head"><text class="col__title">饮食</text><view class="col__add" bindtap="openFoodModal">+</view></view>
-        <view class="col__list">
-          <view wx:for="{{mealList}}" wx:key="type" class="item meal-item" bindtap="showMealDetail" data-type="{{item.type}}">
-            <text class="item__name">{{item.name}}</text>
-            <text class="item__meta">{{item.empty?'0 kcal':item.total+' kcal'}}</text>
-          </view>
-        </view>
-      </view>
       <!-- SUPPS: 补剂（不计热量，勾选每日重置） -->
       <view class="col__block supp-block">
         <view class="col__head">
@@ -106,6 +79,33 @@
             </view>
             <view class="item__del" catchtap="confirmDelSupp" data-i="{{item.i}}">删除</view>
             <view class="item__check {{item.done?'done':''}}" catchtap="toggleSupp" data-i="{{item.i}}"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 饮食 + 有氧 -->
+    <view class="col col--diet">
+      <view class="col__block">
+        <view class="col__head"><text class="col__title">饮食</text><view class="col__add" bindtap="openFoodModal">+</view></view>
+        <view class="col__list">
+          <view wx:for="{{mealList}}" wx:key="type" class="item meal-item" bindtap="showMealDetail" data-type="{{item.type}}">
+            <text class="item__name">{{item.name}}</text>
+            <text class="item__meta">{{item.empty?'0 kcal':item.total+' kcal'}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="col__block" style="border-top:1px solid var(--rule)">
+        <view class="col__head"><text class="col__title">有氧</text><view class="col__add" bindtap="openCardioModal">+</view></view>
+        <view class="col__list">
+          <view wx:if="{{cardioList.length===0}}" class="empty">暂无有氧训练，点击 + 添加</view>
+          <view wx:for="{{cardioList}}" wx:key="i" class="item item--train" bindtap="showCardioDetail" data-i="{{item.i}}">
+            <view class="item__main">
+              <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
+              <text wx:if="{{item.meta}}" class="item__meta">{{item.meta}}</text>
+            </view>
+            <view class="item__del" catchtap="confirmDelCardio" data-i="{{item.i}}">删除</view>
+            <view class="item__check {{item.done?'done':''}}" catchtap="toggleCardio" data-i="{{item.i}}"></view>
           </view>
         </view>
       </view>
