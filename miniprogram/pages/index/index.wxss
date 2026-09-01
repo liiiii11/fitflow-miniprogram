@@ -36,11 +36,12 @@
 .intake-bar__f { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
 
 /* ============ MAIN GRID ============ */
-/* 左右两栏宽度动态浮动：训练列宽度跟随最长动作名（不主动扩张、空间不够时动作名省略号截断）；
-   饮食列吃掉剩余空间、随训练名变长被向右挤窄，最窄 82px 刚好容下最长餐名+热量；
-   两侧都到最长文字时优先保饮食区完整，训练动作名走省略号 */
-.main { flex: 1; display: flex; gap: 14px; }
-.col { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--rule); padding-right: 12px; }
+/* 左右两栏宽度动态浮动：训练列宽度跟随最长动作名（名字短则列窄、饮食列宽）；
+   但训练列最宽封顶 = 整行 - 96px（饮食列最小宽 82px + 列间距 14px），
+   名字超过封顶 → 训练列内部省略号截断，饮食列保底 82px 不被挤出屏幕
+   （用户要求：挤压右侧空间的最低限度 = 饮食显示的最小值） */
+.main { flex: 1; display: flex; gap: 14px; min-width: 0; }
+.col { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 96px); display: flex; flex-direction: column; border-right: 1px solid var(--rule); padding-right: 12px; }
 .col--diet { flex: 1 0 auto; min-width: 82px; border-right: none; padding-right: 0; }
 .col__block { display: flex; flex-direction: column; }
 .col__head { display: flex; align-items: center; justify-content: space-between; padding: 10px 0 6px; flex-shrink: 0; }
