@@ -82,9 +82,9 @@
 
 /* ============ SUPPS (补剂：饮食区下方，不计热量) ============ */
 .supp-block { border-top: 1px solid var(--rule); }
-.supp-block .item__main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-.supp-block .item__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.supp-block .item__meta { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.supp-block .item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.supp-block .item__name { flex: none; display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.supp-block .item__meta { font-size: 12px; color: var(--muted); flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ============ DAY SWITCHER ============ */
 .day-switch { display: inline-flex; align-items: center; gap: 2px; }
