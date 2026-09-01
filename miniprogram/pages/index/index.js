@@ -193,6 +193,14 @@ Page({
     const today = todayKey();
     if (this.state.lastActiveDate !== today) {
       this.archiveDay(this.state.lastActiveDate);
+      // 必须在清零 done 之前记录「最后实际练过的训练日」：
+      // 先清零再遍历判断，所有 done 都是 false，lastTrainedIdx 恒为 -1，
+      // 跨天就会错误地从「当前停留日+1」顺延（中途切走只看不练时会跳过未练的训练日）
+      const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
+      let lastTrainedIdx = -1;
+      if (plan && plan.days) {
+        plan.days.forEach((d, i) => { if ((d.exercises || []).some(e => e.done)) lastTrainedIdx = i; });
+      }
       this.state.water = 0;
       this.state.meals = { breakfast: { name: '早餐', items: [] }, lunch: { name: '午餐', items: [] }, dinner: { name: '晚餐', items: [] }, snack: { name: '加餐', items: [] } };
       this.getAllPlans().forEach(p => {
@@ -201,11 +209,8 @@ Page({
       this.state.cardio = [];
       // 补剂：清单保留，勾选状态每天重置
       (this.state.supps || []).forEach(s => { s.done = false; });
-      const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
       if (plan && plan.days && plan.days.length > 0) {
         // 从最后一个实际练过的训练日顺延（当天中途切走只看不练时，不跳过未练的训练日）
-        let lastTrainedIdx = -1;
-        plan.days.forEach((d, i) => { if ((d.exercises || []).some(e => e.done)) lastTrainedIdx = i; });
         const base = lastTrainedIdx >= 0 ? lastTrainedIdx : this.state.currentDayIdx;
         this.state.currentDayIdx = (base + 1) % plan.days.length;
       }
@@ -223,9 +228,13 @@ Page({
     if (!h.water) h.water = this.state.water * CUP_ML;
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days) {
-      const day = plan.days[this.state.currentDayIdx % plan.days.length];
-      h.planId = this.state.currentPlanId;
-      h.dayName = day ? day.name : '';
+      // 只在缺省时补记 planId/dayName：当天记录已由 recordTodayToHistory 写入
+      // 「实际练过的训练日」，跨天归档时若直接覆盖会把历史训练日改成当前停留日
+      if (!h.dayName) {
+        const day = plan.days[this.state.currentDayIdx % plan.days.length];
+        h.planId = this.state.currentPlanId;
+        h.dayName = day ? day.name : '';
+      }
     }
   },
   recordTodayToHistory() {
@@ -1052,7 +1061,7 @@ Page({
     const m = this.state.meals[type];
     if (!m) return;
     const items = (m.items || []).map((item, idx) => ({ name: item.name, sub: item.sub || '', cal: item.cal, idx: idx }));
-    let total = (m.items || []).reduce((s, i) => s + i.cal, 0);
+    let total = (m.items || []).reduce((s, i) => s + (isFinite(i.cal) ? i.cal : 0), 0);
     this.setData({ mealDetailTitle: m.name || MEAL_LABELS[type], mealDetailItems: items, mealDetailTotal: total, _mealDetailType: type });
     this.openModal('meal');
   },
@@ -1181,7 +1190,17 @@ Page({
     const total = this._pickedFoods.reduce((s, f) => s + f.cal, 0);
     this.setData({ foodPickList: list, foodPickSummary: this._pickedFoods.length ? '已选 ' + this._pickedFoods.length + ' 项 · 共 ' + total + ' kcal' : '' });
   },
-  cancelFood() { this._fromMealDetail = false; this.closeOverlay(); },
+  cancelFood() {
+    const fromMeal = this._fromMealDetail;
+    const type = this.state.selectedMealType;
+    this._fromMealDetail = false;
+    this.closeOverlay();
+    // 从餐次详情进入的：等关闭动画结束后回到该餐详情，不丢上下文
+    if (fromMeal && type && this.state.meals[type]) {
+      const self = this;
+      setTimeout(() => self.showMealDetail({ currentTarget: { dataset: { type: type } } }), 250);
+    }
+  },
   confirmAddFood() {
     const manualName = this.data.manualFoodName.trim();
     if (manualName) {
@@ -1397,6 +1416,7 @@ Page({
     if (!this._detailPlanId) return;
     const plan = this.getAllPlans().find(p => p.id === this._detailPlanId);
     if (!plan) return;
+    this._editorBackTo = 'planDetail';
     this._editorDays = plan.days.map(d => ({ name: d.name, exercises: d.exercises.map(x => JSON.parse(JSON.stringify(x))) }));
     this.pushPage('planEditor', {
       planEditorTitle: '编辑计划',
@@ -1446,6 +1466,7 @@ Page({
   // ---- 计划编辑器 ----
   openPlanEditor() {
     this._detailPlanId = null;
+    this._editorBackTo = 'plans';
     this._editorDays = [];
     this.pushPage('planEditor', {
       planEditorTitle: '新建计划',
@@ -1567,7 +1588,7 @@ Page({
       planDetailApplyDisabled: isCurrent
     });
   },
-  cancelPlanEditor() { this.popPage('plans'); },
+  cancelPlanEditor() { this.popPage(this._editorBackTo || 'plans'); },
 
   // ==================== PAGES (全屏页) ====================
   // openPage：前进导航（push）——目标页自右推入
