@@ -107,7 +107,7 @@ Page({
     waterMl: 0, waterGoal: DEFAULT_WATER_GOAL, waterPct: 0,
     planTitle: '训练', planLabel: '', dayLocked: false,
     exList: [], cardioList: [],
-    exDragIdx: -1,
+    exDragIdx: -1, exDragY: 0,
     mealList: [],
     suppList: [], suppName: '', suppUnit: 'ml', suppDose: '',
     pageOverlay: '', modalOverlay: '', ovClosing: false,
@@ -265,6 +265,11 @@ Page({
     }
   },
   saveState() {
+    // 先刷新当天 history 再落盘：多处调用点是「saveState → updateIntake → recordTodayToHistory」，
+    // 若不在写盘前刷 history，storage 里当天的 intake/water/burn 永远是上一次操作的旧值，
+    // 用户最后一次操作后直接退出会丢失最终记录（热力图/跨天归档数据偏小）。
+    // recordTodayToHistory 内部不调 saveState，无递归。
+    this.recordTodayToHistory();
     storage.saveAppState(this.state);
   },
 
@@ -524,7 +529,10 @@ Page({
   // ---- 长按拖动排序（力量训练）：被拖项跟手 + 被越过的行平滑让位 ----
   onExDragStart(e) {
     if (this.data.exList.length < 2) return;
-    const i = e.currentTarget.dataset.i;
+    // dataset 恒为字符串，必须转数字：findIndex(v => v.i === i) 与 wxml 的
+    // exDragIdx===item.i 都是严格相等，字符串 "0" 匹配不到数字 0 → 拖动完全失效
+    const i = parseInt(e.currentTarget.dataset.i, 10);
+    if (!isFinite(i) || i < 0) return;
     const t = e.touches && e.touches[0];
     this._dragHeights = null;
     this._dragPos = this.data.exList.findIndex(v => v.i === i);
@@ -693,14 +701,17 @@ Page({
   updateGoalWeightHint() {
     const cur = this.state.metrics.current ? this.state.metrics.current.weight : null;
     const target = this.state.goalWeight;
+    // storage 旧数据可能存字符串，.toFixed 会抛错；统一 Number 保护
+    const curN = Number(cur);
+    const targetN = Number(target);
     let hint;
-    if (cur == null) {
+    if (cur == null || !isFinite(curN) || !isFinite(targetN)) {
       hint = '请先记录当前体重，获取个性化减脂建议';
     } else {
-      const diff = target - cur;
+      const diff = targetN - curN;
       const recCals = this.getRecommendedCals();
       const diffStr = diff > 0 ? '+' + diff.toFixed(1) : diff.toFixed(1);
-      hint = '当前 ' + cur.toFixed(1) + ' kg → 目标 ' + target.toFixed(1) + ' kg (' + diffStr + ' kg) · 建议 ' + recCals.toLocaleString() + ' kcal/天';
+      hint = '当前 ' + curN.toFixed(1) + ' kg → 目标 ' + targetN.toFixed(1) + ' kg (' + diffStr + ' kg) · 建议 ' + recCals.toLocaleString() + ' kcal/天';
     }
     this.setData({ goalWeightInput: String(target), goalWeightHint: hint });
   },
@@ -1238,14 +1249,17 @@ Page({
     let weightVal = '--', bodyFatVal = '--', weightDiff = '', bodyFatDiff = '', mWeight = '', mBodyFat = '';
     if (cur) {
       const prev = this.state.metrics.previous || cur;
-      weightVal = cur.weight.toFixed(1);
-      bodyFatVal = cur.bodyFat.toFixed(1);
-      const wd = cur.weight - prev.weight;
-      const bd = cur.bodyFat - prev.bodyFat;
+      // storage 旧数据可能把数字存成字符串，.toFixed 会直接抛错崩溃；统一 Number 保护
+      const w = Number(cur.weight), b = Number(cur.bodyFat);
+      const pw = Number(prev.weight), pb = Number(prev.bodyFat);
+      weightVal = isFinite(w) ? w.toFixed(1) : '--';
+      bodyFatVal = isFinite(b) ? b.toFixed(1) : '--';
+      const wd = isFinite(w) && isFinite(pw) ? w - pw : 0;
+      const bd = isFinite(b) && isFinite(pb) ? b - pb : 0;
       weightDiff = (wd > 0 ? '+' : '') + wd.toFixed(1);
       bodyFatDiff = (bd > 0 ? '+' : '') + bd.toFixed(1);
-      mWeight = cur.weight;
-      mBodyFat = cur.bodyFat;
+      mWeight = w;
+      mBodyFat = b;
     }
     this.setData({ weightVal, bodyFatVal, weightDiff, bodyFatDiff, mWeight, mBodyFat });
     this.updateGoalWeightHint();
