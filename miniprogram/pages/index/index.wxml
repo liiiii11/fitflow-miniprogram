@@ -40,7 +40,7 @@
         <view class="col__head">
           <view style="display:flex;align-items:center">
             <view class="col__title col__title--plan" bindtap="openPlans">{{planTitle}}</view>
-            <view class="day-switch {{dayLocked?'locked':''}}" bindtap="switchDay" data-d="1">
+            <view class="day-switch" bindtap="switchDay" data-d="1">
               <text class="day-switch__label">{{planLabel}}</text>
               <text class="day-switch__arrow">▾</text>
             </view>
@@ -331,6 +331,7 @@
       <text class="fg__lbl">单位</text>
       <view class="meal-type-sel" style="margin-top:8px;margin-bottom:0">
         <view class="meal-type {{suppUnit==='ml'?'on':''}}" bindtap="selectSuppUnit" data-u="ml">毫升 (ml)</view>
+        <view class="meal-type {{suppUnit==='g'?'on':''}}" bindtap="selectSuppUnit" data-u="g">克 (g)</view>
         <view class="meal-type {{suppUnit==='pill'?'on':''}}" bindtap="selectSuppUnit" data-u="pill">颗</view>
       </view>
     </view>

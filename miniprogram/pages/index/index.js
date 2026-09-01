@@ -203,7 +203,11 @@ Page({
       (this.state.supps || []).forEach(s => { s.done = false; });
       const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
       if (plan && plan.days && plan.days.length > 0) {
-        this.state.currentDayIdx = (this.state.currentDayIdx + 1) % plan.days.length;
+        // 从最后一个实际练过的训练日顺延（当天中途切走只看不练时，不跳过未练的训练日）
+        let lastTrainedIdx = -1;
+        plan.days.forEach((d, i) => { if ((d.exercises || []).some(e => e.done)) lastTrainedIdx = i; });
+        const base = lastTrainedIdx >= 0 ? lastTrainedIdx : this.state.currentDayIdx;
+        this.state.currentDayIdx = (base + 1) % plan.days.length;
       }
       this.state.lastActiveDate = today;
       this.saveState();
@@ -230,8 +234,8 @@ Page({
       this.state.history[today] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
     }
     const h = this.state.history[today];
-    const exs = this.getCurrentExercises();
-    const completedExs = exs.filter(e => e.done);
+    const exs = this.getCompletedExercises();
+    const completedExs = exs;
     h.trained = completedExs.length > 0 ? 1 : 0;
     h.burn = this.estimateBurn(completedExs) + this.getCardioBurn();
     const doneCardio = (this.state.cardio || []).filter(c => c.done);
@@ -241,9 +245,14 @@ Page({
     h.water = this.state.water * CUP_ML;
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days) {
+      // 记录实际练过的训练日名（跨日切换后不丢）；没练则记当前查看的训练日
+      let trainedDayName = '';
+      plan.days.forEach(d => {
+        if (!trainedDayName && (d.exercises || []).some(e => e.done)) trainedDayName = d.name;
+      });
       const day = plan.days[this.state.currentDayIdx % plan.days.length];
       h.planId = this.state.currentPlanId;
-      h.dayName = day ? day.name : '';
+      h.dayName = trainedDayName || (day ? day.name : '');
     }
   },
   saveState() {
@@ -338,7 +347,13 @@ Page({
     this.setData({ burn: burn });
   },
   getCompletedExercises() {
-    return this.getCurrentExercises().filter(e => e.done);
+    // done 每天清零，因此「今天完成的动作」= 当前计划所有训练日中 done 的动作
+    // （当天中途切换训练日后，已勾选的其他训练日仍计入今日消耗与记录）
+    const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
+    if (!plan || !plan.days) return [];
+    const out = [];
+    plan.days.forEach(d => (d.exercises || []).forEach(e => { if (e.done) out.push(e); }));
+    return out;
   },
   // 勾选完成后防抖触发 AI 校准
   scheduleBurnCalib() {
@@ -619,7 +634,7 @@ Page({
     const view = list.map((s, i) => ({
       k: s.id || ('i' + i),
       name: s.name,
-      dose: (isFinite(s.dose) ? s.dose : '') + ' ' + (s.unit === 'pill' ? '颗' : 'ml'),
+      dose: (isFinite(s.dose) ? s.dose : '') + ' ' + (s.unit === 'pill' ? '颗' : (s.unit === 'g' ? 'g' : 'ml')),
       done: !!s.done,
       i: i
     }));
@@ -856,10 +871,7 @@ Page({
     const delta = e.currentTarget.dataset.d;
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (!plan || !plan.days || plan.days.length === 0) return;
-    if (this.getCurrentExercises().some(e => e.done)) {
-      this.toast('今天已完成训练，训练日已锁定，明天自动切换');
-      return;
-    }
+    if (plan.days.length === 1) { this.toast('当前计划只有 1 个训练日'); return; }
     this.state.currentDayIdx = (this.state.currentDayIdx + delta + plan.days.length) % plan.days.length;
     this.saveState();
     this.renderExList();
@@ -997,7 +1009,7 @@ Page({
   addSupp() {
     const name = this.data.suppName.trim();
     const dose = parseFloat(this.data.suppDose);
-    const unit = this.data.suppUnit === 'pill' ? 'pill' : 'ml';
+    const unit = (this.data.suppUnit === 'pill' || this.data.suppUnit === 'g') ? this.data.suppUnit : 'ml';
     if (!name) { this.toast('请输入补剂名称'); return; }
     if (!dose || dose <= 0) { this.toast('请输入剂量'); return; }
     if (!Array.isArray(this.state.supps)) this.state.supps = [];
