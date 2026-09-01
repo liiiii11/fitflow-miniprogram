@@ -958,8 +958,11 @@ Page({
     if (!dur || dur <= 0) { this.toast('请输入时长'); return; }
     if (!isFinite(burn) || burn < 0) { this.toast('请输入有效消耗'); return; }
     if (!Array.isArray(this.state.cardio)) this.state.cardio = [];
-    this.state.cardio.push({ name, dur, burn: Math.round(burn), meta: dur + '分钟·' + Math.round(burn) + 'kcal', done: false });
+    // 添加后自动勾选：有氧动作一添加即视为「今日已完成」，消耗立即计入今日统计；
+    // 列表每天跨天清空（checkDailyReset），无需担心昨日有氧残留
+    this.state.cardio.push({ name, dur, burn: Math.round(burn), meta: dur + '分钟·' + Math.round(burn) + 'kcal', done: true });
     this.saveState();
+    this.updateBurn();
     this.renderCardioList();
     this.closeOverlay();
     this.toast('已添加: ' + name);
