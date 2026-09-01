@@ -63,8 +63,9 @@
 
 /* 训练列表（力量+有氧）：名字占满一行，时间/热量/重量 换行到下方，字体更小 */
 .item--train .item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.item--train .item__name { font-size: 15px; font-weight: 500; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item--train .item__meta { font-size: 12px; color: var(--muted); flex: none; }
+/* text 组件在 flex 列容器中宽度按内容计算（stretch 失效），必须 display:block + width:100% 才能触发 ellipsis 挤压 */
+.item--train .item__name { font-size: 15px; font-weight: 500; flex: none; display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item--train .item__meta { font-size: 12px; color: var(--muted); flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 长按拖动排序：被拖起的动作跟手（无过渡），被越过的行平滑让位（tf-shift 才有 transform 过渡） */
 .ex-item { transition: background .15s, box-shadow .15s; }
@@ -269,10 +270,11 @@
 .food-cat { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; padding: 12px 0 4px; }
 .food-cat:first-child { padding-top: 0; }
 .meal-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.meal-row > text:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meal-row:active { background: var(--rule); }
 .meal-row.picked { background: var(--text); color: var(--bg); }
 .meal-row.picked .meal-row__cals { color: rgba(255, 255, 255, .6); }
-.meal-row__cals { font-size: 12px; color: var(--muted); }
+.meal-row__cals { font-size: 12px; color: var(--muted); flex-shrink: 0; margin-left: 10px; }
 
 /* ============ TOAST ============ */
 .toast {

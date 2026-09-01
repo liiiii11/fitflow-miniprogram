@@ -239,13 +239,13 @@
   <view wx:if="{{!planDetailDays.length}}" style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px">暂无训练日</view>
   <view wx:for="{{planDetailDays}}" wx:key="index" style="margin-bottom:20px">
     <view style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--rule);margin-bottom:8px">
-      <text style="font-size:14px;font-weight:600">{{item.name}}</text>
-      <text style="font-size:11px;color:var(--muted)">{{item.count}} 个动作</text>
+      <text style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</text>
+      <text style="font-size:11px;color:var(--muted);flex-shrink:0;margin-left:10px">{{item.count}} 个动作</text>
     </view>
     <view wx:if="{{item.exs.length===0}}" style="padding:8px 0;color:var(--muted);font-size:12px">暂无动作</view>
     <view wx:for="{{item.exs}}" wx:for-item="ex" wx:key="index" style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
-      <text style="font-size:14px">{{ex.name}}</text>
-      <text style="font-size:12px;color:var(--muted)">{{ex.meta}}</text>
+      <text style="font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ex.name}}</text>
+      <text style="font-size:12px;color:var(--muted);flex-shrink:0;margin-left:10px">{{ex.meta}}</text>
     </view>
   </view>
   <view style="display:flex;gap:12px;margin-top:24px">
@@ -263,8 +263,8 @@
   <view wx:if="{{planDaysView.length===0}}" style="padding:16px 0;text-align:center;color:var(--muted);font-size:12px">暂无训练日，在下方输入名称添加</view>
   <view wx:for="{{planDaysView}}" wx:key="i" style="padding:12px 0;border-bottom:1px solid var(--rule)">
     <view style="display:flex;align-items:center;justify-content:space-between">
-      <text style="font-size:14px;font-weight:600">{{item.name}}</text>
-      <view style="display:flex;align-items:center;gap:10px">
+      <text style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</text>
+      <view style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:10px">
         <text style="font-size:12px;color:var(--muted)">{{item.count}} 个动作</text>
         <text style="font-size:12px;color:var(--text);font-weight:500" bindtap="openDayEditor" data-i="{{item.i}}">编辑动作</text>
         <text style="font-size:12px;color:var(--danger)" bindtap="removeEditorDay" data-i="{{item.i}}">删除</text>
@@ -358,7 +358,7 @@
 <!-- 动作设置（重量/次数） -->
 <view wx:if="{{modalOverlay==='exDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
-    <view class="sheet__title">{{exDetailTitle}}</view>
+    <view class="sheet__title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{exDetailTitle}}</view>
     <view class="fg__row">
       <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exSetWt}}" bindinput="onExSetWt" cursor-spacing="120"/></view>
       <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSetSets}}" bindinput="onExSetSets" cursor-spacing="120"/></view>
@@ -489,11 +489,11 @@
     <view wx:if="{{mealDetailItems.length===0}}" style="text-align:center;padding:32px 0;color:var(--muted);font-size:14px">还没有记录，点击下方「添加食物」</view>
     <block wx:else>
       <view wx:for="{{mealDetailItems}}" wx:key="idx" style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--rule)">
-        <view>
-          <view style="font-size:15px">{{item.name}}</view>
-          <view wx:if="{{item.sub}}" style="font-size:12px;color:var(--muted);margin-top:2px">{{item.sub}}</view>
+        <view style="flex:1;min-width:0">
+          <view style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</view>
+          <view wx:if="{{item.sub}}" style="font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.sub}}</view>
         </view>
-        <view style="display:flex;align-items:center;gap:10px">
+        <view style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:10px">
           <text style="font-size:14px;font-weight:600;color:var(--accent)">{{item.cal}} kcal</text>
           <text style="font-size:12px;color:var(--danger)" bindtap="delMealItem" data-i="{{item.idx}}">删除</text>
         </view>
@@ -514,11 +514,11 @@
     <view style="margin-bottom:16px">
       <view wx:if="{{dayExList.length===0}}" style="text-align:center;padding:16px 0;color:var(--muted);font-size:13px">暂无动作，在下方添加</view>
       <view wx:for="{{dayExList}}" wx:key="i" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--rule)">
-        <view>
-          <view style="font-size:14px">{{item.name}}</view>
-          <view wx:if="{{item.meta}}" style="font-size:11px;color:var(--muted);margin-top:2px">{{item.meta}}</view>
+        <view style="flex:1;min-width:0">
+          <view style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</view>
+          <view wx:if="{{item.meta}}" style="font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.meta}}</view>
         </view>
-        <text style="font-size:12px;color:var(--danger)" bindtap="removeEditorDayEx" data-i="{{item.i}}">删除</text>
+        <text style="font-size:12px;color:var(--danger);flex-shrink:0;margin-left:10px" bindtap="removeEditorDayEx" data-i="{{item.i}}">删除</text>
       </view>
     </view>
     <view style="border-top:1px solid var(--rule);padding-top:16px">
