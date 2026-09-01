@@ -965,15 +965,15 @@ Page({
     this.updateBurn();
     this.renderCardioList();
     this.closeOverlay();
-    this.toast('已添加: ' + name);
+    this.toast('已添加（已勾选）: ' + name);
   },
   toggleCardio(e) {
     const idx = e.currentTarget.dataset.i;
     const exs = this.state.cardio || [];
     if (exs[idx]) {
       exs[idx].done = !exs[idx].done;
+      // saveState 内部已刷新当天 history，无需重复 recordTodayToHistory
       this.saveState();
-      this.recordTodayToHistory();
       this.renderCardioList();
       this.updateBurn();
     }
@@ -1442,7 +1442,7 @@ Page({
     const plan = this.getAllPlans().find(p => p.id === this._detailPlanId);
     if (!plan) return;
     this._editorBackTo = 'planDetail';
-    this._editorDays = plan.days.map(d => ({ name: d.name, exercises: d.exercises.map(x => JSON.parse(JSON.stringify(x))) }));
+    this._editorDays = plan.days.map(d => ({ name: d.name, exercises: (d.exercises || []).map(x => JSON.parse(JSON.stringify(x))) }));
     this.pushPage('planEditor', {
       planEditorTitle: '编辑计划',
       planName: plan.name,
