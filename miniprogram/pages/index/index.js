@@ -949,6 +949,9 @@ Page({
     }
     ex.meta = meta;
     ex.metaDate = meta ? todayKey() : '';
+    // 清空重量/组数/次数 = 取消今天的这次记录：已勾选的动作必须同步取消勾选，
+    // 否则会出现「无方案却已完成」的幻影勾选——消耗估算与当日历史把空 meta 当完成动作计入
+    if (!meta) ex.done = false;
     if (this._exDetailFromCheck) {
       ex.done = !!this.todayMeta(ex);
       this._exDetailFromCheck = false;
