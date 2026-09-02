@@ -833,25 +833,41 @@ Page({
       }
     }
   },
-  // 递增组数变化 → 重建行（保留已填的行值）
-  onExProgSets(e) {
-    const raw = e.detail.value;
+  // 递增组数输入：仅原样存入，不在输入过程中校验/重建/钳制。
+  // 否则正常编辑（如把 6 改成 2：光标前移先输 2 → "26"）会被逐键钳制回写、
+  // 行数跳动，表现为输入框被强制改写、数据错乱。统一放到失焦/保存时规范化。
+  onExProgSets(e) { this.setData({ exProgSets: e.detail.value }); },
+  // 组数失焦：规范化组数输入并同步行数（保留已填的行值）
+  onExProgSetsBlur() { this.syncProgSetsRows(true); },
+  // 规范化组数显示与逐组行数一致：
+  //  合法 1-6 → 行数同步为组数；越界非空 → 钳制到 6/1 并提示；空 → 回填为当前行数
+  syncProgSetsRows(tip) {
+    const raw = String(this.data.exProgSets == null ? '' : this.data.exProgSets).trim();
     const n = parseInt(raw, 10);
-    if (raw === '') { this.setData({ exProgSets: '' }); return; }
-    if (n >= 1 && n <= 6) { this.setData({ exProgSets: String(n) }); this.setProgRows(n); return; }
-    // 越界输入钳制到边界并提示
-    const c = n > 6 ? 6 : 1;
-    this.setData({ exProgSets: String(c) });
-    this.setProgRows(c);
-    this.toast('递增组数需在 1-6 之间');
+    const cur = (this.data.exProgRows || []).length;
+    if (n >= 1 && n <= 6) {
+      if (n !== cur) this.setProgRows(n);
+      return;
+    }
+    if (raw !== '') {
+      const c = n > 6 ? 6 : 1;
+      if (tip) this.toast('递增组数需在 1-6 之间，已按 ' + c + ' 组处理');
+      this.setData({ exProgSets: String(c) });
+      if (c !== cur) this.setProgRows(c);
+      return;
+    }
+    // 组数被清空：行数据不动，仅把组数显示回填为当前行数
+    this.setData({ exProgSets: String(cur || 3) });
   },
   onExProgWt(e) { this.setProgCell(parseInt(e.currentTarget.dataset.i, 10), e.detail.value, null); },
   onExProgReps(e) { this.setProgCell(parseInt(e.currentTarget.dataset.i, 10), null, e.detail.value); },
   setProgCell(i, wt, reps) {
-    const rows = (this.data.exProgRows || []).slice();
-    if (!rows[i]) return;
-    rows[i] = { wt: wt != null ? wt : rows[i].wt, reps: reps != null ? reps : rows[i].reps };
-    this.setData({ exProgRows: rows });
+    // 按 key path 只更新目标行字段，避免整表替换导致其余行 input 重渲染
+    if (!this.data.exProgRows || !this.data.exProgRows[i]) return;
+    const patch = {};
+    if (wt != null) patch['exProgRows[' + i + '].wt'] = wt;
+    if (reps != null) patch['exProgRows[' + i + '].reps'] = reps;
+    this.setData(patch);
   },
   setProgRows(n) {
     const old = this.data.exProgRows || [];
@@ -868,6 +884,8 @@ Page({
     if (!name) { this.toast('请输入动作名称'); return; }
     let meta = '', progCount = 0;
     if (this.data.exLoadMode === 'prog') {
+      // 组数框可能处于未失焦的中间态（如刚输入数字还没离开输入框），先规范化再取行
+      this.syncProgSetsRows(false);
       const r = this.buildProgMetaFromRows(this.data.exProgRows);
       if (!r.ok) { this.toast(r.err); return; }
       meta = r.meta;
@@ -940,7 +958,8 @@ Page({
     if (!ex) { this.closeOverlay(); return; }
     let meta;
     if (this.data.exLoadMode === 'prog') {
-      // 递增：按逐组行校验并生成方案（不足 2 组会拒绝，避免退化成单组丢中间重量）
+      // 递增：先按组数规范化逐组行，再校验生成方案（不足 2 组会拒绝，避免退化成单组丢中间重量）
+      this.syncProgSetsRows(false);
       const r = this.buildProgMetaFromRows(this.data.exProgRows);
       if (!r.ok) { this.toast(r.err); return; }
       meta = r.meta;
