@@ -550,8 +550,17 @@ Page({
     const planTitle = plan ? plan.name : '训练';
     const planLabel = (plan && plan.days && plan.days.length > 0) ? plan.days[this.state.currentDayIdx % plan.days.length].name : '';
     const dayLocked = exs.some(e => e.done);
-    // 拖动态复位与列表刷新同帧提交：避免「先复位再重排」中间出现被拖项跳回原位的闪烁帧
-    this.setData({ planTitle, planLabel, dayLocked, exList: this.buildExView(), exDragIdx: -1, exDragY: 0 });
+    // 拖动态复位与列表刷新同帧提交（正常路径）：避免「先复位再重排」中间出现被拖项跳回原位的闪烁帧。
+    // 例外：拖拽进行中（exDragIdx>=0）被外部刷新触发（AI 校准完成/兜底回写消耗后也会 renderExList，
+    //   或任意异步回调落地）——此时必须保留拖动态。否则拖拽会被中途打断：onExDragMove 首行
+    //   exDragIdx<0 直接 return（不再跟手）、onExDragEnd 首行 return（排序不提交、白拖一场）。
+    //   拖拽结束由 onExDragEnd 自身复位 exDragIdx/exDragY。
+    const dragging = this.data.exDragIdx >= 0;
+    this.setData({
+      planTitle, planLabel, dayLocked, exList: this.buildExView(),
+      exDragIdx: dragging ? this.data.exDragIdx : -1,
+      exDragY: dragging ? this.data.exDragY : 0
+    });
   },
   // 动作稳定 key：跨排序不变。否则提交排序后节点原地换内容，done(对勾)状态在
   // 错误位置翻转，.item__check 的 0.12s 过渡会闪现（打勾项与未打勾项互换位置时尤其明显）

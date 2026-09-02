@@ -100,7 +100,7 @@
         </view>
         <view class="col__list">
           <view wx:if="{{suppList.length===0}}" class="empty">暂无补剂，点击 + 添加</view>
-          <view wx:for="{{suppList}}" wx:key="k" class="item supp-item">
+          <view wx:for="{{suppList}}" wx:key="k" class="item">
             <view class="item__main">
               <text class="item__name {{item.done?'done':''}}">{{item.name}}</text>
               <text class="item__meta">{{item.dose}}</text>
