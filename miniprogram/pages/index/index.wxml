@@ -291,11 +291,8 @@
     <view class="sheet__title">添加训练</view>
     <view class="fg"><text class="fg__lbl">动作</text><input class="fg__inp" placeholder="动作名称" value="{{exName}}" bindinput="onExNameInput" cursor-spacing="120"/></view>
     <view class="mode-seg">
-      <view class="mode-chips">
-        <view class="mode-thumb {{exLoadMode==='prog'?'right':''}}"></view>
-        <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
-        <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
-      </view>
+      <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
+      <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
       <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
     </view>
     <view class="ex-pane {{exShowMode==='fixed'?'':'ex-pane-hide'}}">
@@ -402,11 +399,8 @@
     <!-- 未勾选 → 可编辑（固定 / 递增双模式） -->
     <block wx:else>
       <view class="mode-seg">
-        <view class="mode-chips">
-          <view class="mode-thumb {{exLoadMode==='prog'?'right':''}}"></view>
-          <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
-          <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
-        </view>
+        <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
+        <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
         <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
       </view>
       <view class="ex-pane {{exShowMode==='fixed'?'':'ex-pane-hide'}}">
