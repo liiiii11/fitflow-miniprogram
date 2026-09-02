@@ -258,10 +258,17 @@
 /* 按压即时反馈：指腹点下有轻微收缩，松手回弹（配合上面 .12s transform 过渡） */
 .chip-press { transform: scale(.93); }
 .mode-seg__tip { font-size: 11px; color: var(--muted); flex: 1; text-align: right; }
-/* 固定/递增表单切换：单表单渲染（wx:if，仅当前模式一套 input 在树中）——
-   真机性能优先：双面板常驻叠放会使原生 <input> 数量翻倍（固定3 + 递增最多13 ≈ 16 个常驻），
-   打开弹窗全量创建、每次 setData 双树 diff，真机明显卡顿；改回单套表单后切换=瞬时替换，
-   观感交由 mode-chip 颜色过渡与按压反馈承载（干净利落，避免重建卡顿帧）。 */
+/* 固定/递增表单切换——两段式离场/入场过渡（单表单渲染约束下的最优解）：
+   t0 旧表单挂 .leaving → opacity 1→0 过渡 .1s（期间仍在树、输入值不丢）；
+   t0+110ms wx:if 按 exShowMode 换内容，新表单挂载即播 exPaneFadeIn 淡入 .14s。
+   仅 opacity、无 transform/位移：既保留「去→来」的过程感，又不翻倍原生 input
+   （46ff263 双面板 16 个 input 常驻的真机卡顿教训）、不引位移动画下原生组件的渲染异常。 */
+.ex-pane { animation: exPaneFadeIn .14s ease-out; }
+.ex-pane.leaving { animation: none; opacity: 0; transition: opacity .1s ease; }
+@keyframes exPaneFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 /* 递增逐组填写行 */
 .prog-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .prog-row:last-child { border-bottom: none; }

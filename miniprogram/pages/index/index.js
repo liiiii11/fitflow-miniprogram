@@ -114,6 +114,9 @@ Page({
     pageLeaving: '', pageUnder: '', pgClosing: false, pgAnim: 'push',
     exName: '', exSaving: false, exWt: '', exSets: '', exReps: '',
     exLoadMode: 'fixed', exProgSets: '3', exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+    // 固定/递增切换过渡：exLoadMode 驱动 chip 高亮与数据（点击立即生效），
+    // exShowMode 驱动内容实际渲染（离场淡出结束后才切换，避免 wx:if 瞬切无过渡帧）
+    exShowMode: 'fixed', exPaneLeaving: false,
     coName: '', coDur: '30', coBurn: '', coCalHint: '',
     confirmDelText: '',
     exDetailTitle: '', exDetailBurn: '',
@@ -796,7 +799,8 @@ Page({
     this.showModal('ex', {
       pageOverlay: '',
       exName: '', exWt: '', exSets: '', exReps: '',
-      exLoadMode: 'fixed', exProgSets: '3',
+      exLoadMode: 'fixed', exShowMode: 'fixed', exPaneLeaving: false,
+      exProgSets: '3',
       exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
     });
   },
@@ -804,11 +808,23 @@ Page({
   onExWt(e) { this.setData({ exWt: e.detail.value }); },
   onExSets(e) { this.setData({ exSets: e.detail.value }); },
   onExReps(e) { this.setData({ exReps: e.detail.value }); },
-  // 固定 / 递增 填写方式切换
+  // 固定 / 递增 填写方式切换：两段式过渡，避免 wx:if 瞬切（无过渡帧、观感干）。
+  //   t0：exLoadMode 与数据迁移立即生效 → chip 高亮即时平滑变色；旧表单进入离场态
+  //       （.ex-pane.leaving 0.1s 淡出，期间内容仍是旧模式，输入框仍在树、值不丢）。
+  //   t0+110ms：exShowMode 切到新模式 → wx:if 卸载旧表单、挂载新表单（0.14s 淡入）。
+  // 全程单份输入框在树（不重蹈 46ff263 双面板 16 个原生 input 常驻的真机卡顿）。
+  // 动画中再次点击：跳帧收敛（把 exShowMode 立即收到当前 exLoadMode）再开新一轮，不吞点击。
   switchExMode(e) {
     const m = (e && e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.m : '';
     if (m !== 'fixed' && m !== 'prog') return;
     if (m === this.data.exLoadMode) return;
+    if (this._exSwitchT) {
+      clearTimeout(this._exSwitchT);
+      this._exSwitchT = null;
+      // 上一轮动画未走完：先收敛内容到当前 exLoadMode，避免 exShowMode 悬空
+      this.setData({ exShowMode: this.data.exLoadMode, exPaneLeaving: false });
+    }
+    const patch = {};
     if (m === 'prog') {
       // 已填过的递增行原样保留（详情/添加中来回切换不丢已填组）；
       // 首次切到递增：沿用固定模式已填的组数与首组重量/次数，方便衔接；未填则默认 3 组
@@ -820,9 +836,8 @@ Page({
         for (let k = 0; k < n; k++) rows.push({ wt: '', reps: '' });
         if (this.data.exWt) rows[0].wt = this.data.exWt;
         if (this.data.exReps) rows[0].reps = this.data.exReps;
-        this.setData({ exLoadMode: 'prog', exProgSets: String(n), exProgRows: rows });
-      } else {
-        this.setData({ exLoadMode: 'prog' });
+        patch.exProgSets = String(n);
+        patch.exProgRows = rows;
       }
     } else {
       // 切回固定：若固定输入框为空但已有递增行，用首组重量/次数 + 总组数兜底，避免空表单
@@ -832,11 +847,20 @@ Page({
         const ps = parseInt(this.data.exProgSets, 10);
         const sn = (ps >= 1 && ps <= 6) ? ps : rows.length;
         const first = rows[0] || {};
-        this.setData({ exLoadMode: 'fixed', exWt: first.wt || '', exSets: String(sn), exReps: first.reps || '' });
-      } else {
-        this.setData({ exLoadMode: 'fixed' });
+        patch.exWt = first.wt || '';
+        patch.exSets = String(sn);
+        patch.exReps = first.reps || '';
       }
     }
+    patch.exLoadMode = m;
+    patch.exPaneLeaving = true; // 旧表单开始离场淡出
+    this.setData(patch);
+    const self = this;
+    this._exSwitchT = setTimeout(() => {
+      self._exSwitchT = null;
+      // 离场结束：内容切到新模式（新表单挂载即淡入），复位离场态
+      self.setData({ exShowMode: m, exPaneLeaving: false });
+    }, 110);
   },
   // 递增组数输入：原样保存展示值（不回写输入框），同时做「即时跟随」——
   // 瞬时值一旦已是合法 1-6，立刻增删逐组行（保留已填行值），改完即见，无需等失焦。
@@ -952,7 +976,7 @@ Page({
       if (prog.length) {
         // 当天填的是递增方案：回填成逐组可编辑行，可继续改重量/次数，也可切回固定
         this.setData({
-          exLoadMode: 'prog',
+          exLoadMode: 'prog', exShowMode: 'prog', exPaneLeaving: false,
           exWt: '', exSets: '', exReps: '',
           exProgSets: String(prog.length),
           exProgRows: prog.map(g => ({ wt: String(g.kg), reps: String(g.reps) }))
@@ -963,7 +987,7 @@ Page({
         const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
         const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
         this.setData({
-          exLoadMode: 'fixed',
+          exLoadMode: 'fixed', exShowMode: 'fixed', exPaneLeaving: false,
           exWt: wm ? wm[1] : '', exSets: sm ? sm[1] : '', exReps: rm ? rm[1] : '',
           exProgSets: '3',
           exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
@@ -1027,7 +1051,8 @@ Page({
       this.setData({
         exDetailTitle: ex.name,
         exDetailRO: false, exRORows: [], exROText: '',
-        exLoadMode: 'fixed', exWt: '', exSets: '', exReps: '',
+        exLoadMode: 'fixed', exShowMode: 'fixed', exPaneLeaving: false,
+        exWt: '', exSets: '', exReps: '',
         exProgSets: '3',
         exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
         exDetailBurn: '填写并勾选完成后自动估算消耗'
@@ -1873,6 +1898,12 @@ Page({
   // showModal：统一弹窗打开入口（清除未完成的退场动画计时器，复位 ovClosing）
   showModal(type, extra) {
     if (this._ovCloseTimer) { clearTimeout(this._ovCloseTimer); this._ovCloseTimer = null; }
+    // 打开动作弹窗时清掉可能未走完的固定/递增切换计时器，防止其稍后回写 exShowMode
+    // 与本次打开的初始模式不一致（内容渲染与 chip 高亮错位）
+    if ((type === 'ex' || type === 'exDetail') && this._exSwitchT) {
+      clearTimeout(this._exSwitchT);
+      this._exSwitchT = null;
+    }
     const patch = Object.assign({ modalOverlay: type, ovClosing: false }, extra || {});
     this.setData(patch);
   },
@@ -1884,6 +1915,8 @@ Page({
   // 先播放退场动画（ov-out 类：遮罩渐隐 + 面板下滑），动画结束后再真正卸载。
   closeOverlay() {
     if (!this.data.modalOverlay || this.data.ovClosing) return;
+    // 弹窗关闭：一并终止固定/递增切换过渡计时器（其回调只应在弹窗打开期间执行）
+    if (this._exSwitchT) { clearTimeout(this._exSwitchT); this._exSwitchT = null; }
     this.setData({ ovClosing: true });
     if (this._ovCloseTimer) clearTimeout(this._ovCloseTimer);
     this._ovCloseTimer = setTimeout(() => {

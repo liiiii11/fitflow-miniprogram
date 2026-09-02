@@ -295,7 +295,7 @@
       <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode" hover-class="chip-press" hover-start-time="20" hover-stay-time="100">递增</view>
       <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
     </view>
-    <view wx:if="{{exLoadMode==='fixed'}}">
+    <view wx:if="{{exShowMode==='fixed'}}" class="ex-pane {{exPaneLeaving?'leaving':''}}">
       <view class="fg__row" style="margin-top:14px">
         <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exWt}}" bindinput="onExWt" cursor-spacing="120"/></view>
         <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSets}}" bindinput="onExSets" cursor-spacing="120"/></view>
@@ -303,7 +303,7 @@
       </view>
       <view style="font-size:11px;color:var(--muted);margin-top:4px">三项均可留空，稍后也可点击主页动作名修改</view>
     </view>
-    <view wx:else>
+    <view wx:else class="ex-pane {{exPaneLeaving?'leaving':''}}">
       <view style="display:flex;align-items:flex-end;gap:12px">
         <view class="fg" style="flex:0 0 140px;margin-bottom:6px"><text class="fg__lbl">组数 (1-6)</text><input class="fg__inp" type="number" placeholder="如 3" value="{{exProgSets}}" bindinput="onExProgSets" bindblur="onExProgSetsBlur" cursor-spacing="120"/></view>
         <text style="font-size:11px;color:var(--muted);flex:1;padding-bottom:14px">按顺序填每组重量和次数，后一组更重即为递增</text>
@@ -403,14 +403,14 @@
         <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode" hover-class="chip-press" hover-start-time="20" hover-stay-time="100">递增</view>
         <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
       </view>
-      <view wx:if="{{exLoadMode==='fixed'}}">
+      <view wx:if="{{exShowMode==='fixed'}}" class="ex-pane {{exPaneLeaving?'leaving':''}}">
         <view class="fg__row" style="margin-top:14px">
           <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exWt}}" bindinput="onExWt" cursor-spacing="120"/></view>
           <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSets}}" bindinput="onExSets" cursor-spacing="120"/></view>
           <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{exReps}}" bindinput="onExReps" cursor-spacing="120"/></view>
         </view>
       </view>
-      <view wx:else>
+      <view wx:else class="ex-pane {{exPaneLeaving?'leaving':''}}">
         <view style="display:flex;align-items:flex-end;gap:12px">
           <view class="fg" style="flex:0 0 140px;margin-bottom:6px"><text class="fg__lbl">组数 (1-6)</text><input class="fg__inp" type="number" placeholder="如 3" value="{{exProgSets}}" bindinput="onExProgSets" bindblur="onExProgSetsBlur" cursor-spacing="120"/></view>
           <text style="font-size:11px;color:var(--muted);flex:1;padding-bottom:14px">按顺序填每组重量和次数，后一组更重即为递增</text>
