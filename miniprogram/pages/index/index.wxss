@@ -241,7 +241,8 @@
 .fg__row .fg { flex: 1; }
 /* 固定 / 递增 填写方式切换——灰轨 + 空心细描边胶囊（纯 view、零测量）
    灰轨(.mode-chips)内嵌 .mode-thumb 空心胶囊：透明填充 + 1.5px 细描边
-   （var(--text)，与选中文字同色系——胶囊滑过即「圈住」当前选中的词）。
+   （var(--muted)，比轨道 var(--rule) 深一档的柔和灰，与未选文字同灰阶——
+   不抢选中深色文字的视觉权重，低调圈注当前所在格）。
    透明填充不遮字、无贴片感；细框深色在 var(--rule) 浅灰轨上可辨且克制。
    chip 退化为轨道内等分文字（无边框无背景）：on=--text / off=--muted，
    .18s 颜色过渡；选中权随胶囊移交，滑行中间态两端文字完整可读。
@@ -283,7 +284,7 @@
   top: 2px; bottom: 2px; left: 2px;
   width: calc(50% - 3px);
   background: transparent;
-  border: 1.5px solid var(--text);
+  border: 1.5px solid var(--muted);
   border-radius: 999px;
   box-sizing: border-box;
   transition: transform .2s cubic-bezier(.32, .72, .24, 1);
