@@ -114,6 +114,7 @@ Page({
     pageLeaving: '', pageUnder: '', pgClosing: false, pgAnim: 'push',
     exName: '', exSaving: false, exWt: '', exSets: '', exReps: '',
     exLoadMode: 'fixed', exProgSets: '3', exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+    exPaneH: 0,
     coName: '', coDur: '30', coBurn: '', coCalHint: '',
     confirmDelText: '',
     exDetailTitle: '', exDetailBurn: '',
@@ -792,6 +793,32 @@ Page({
   },
 
   // ==================== EXERCISES ====================
+  // 固定/递增双面板（常驻叠放）切换后：测量两面板实际高度，把容器高度同步为
+  // 当前激活面板的高度（.ex-pane-box 带 height 过渡，切换/行数变化时平滑伸展收缩）。
+  // 仅当可编辑弹窗（添加训练 / 未勾选动作详情）在场时测量；只读详情与其它弹窗无面板，跳过。
+  _syncPaneH() {
+    const mo = this.data.modalOverlay;
+    if (!(mo === 'ex' || (mo === 'exDetail' && !this.data.exDetailRO))) return;
+    if (!wx.createSelectorQuery) return;
+    const self = this;
+    const doQuery = () => {
+      try {
+        wx.createSelectorQuery()
+          .select('.pane-fixed').boundingClientRect()
+          .select('.pane-prog').boundingClientRect()
+          .exec(res => {
+            if (!res || !res[0] || !res[1]) return;
+            const m = self.data.exLoadMode;
+            const h = (m === 'prog' ? res[1].height : res[0].height) || 0;
+            if (h > 1 && Math.abs(h - (self.data.exPaneH || 0)) > 1) {
+              self.setData({ exPaneH: Math.round(h) });
+            }
+          });
+      } catch (e) {}
+    };
+    if (wx.nextTick) wx.nextTick(doQuery);
+    else setTimeout(doQuery, 30);
+  },
   openExModal() {
     this.showModal('ex', {
       pageOverlay: '',
@@ -799,6 +826,7 @@ Page({
       exLoadMode: 'fixed', exProgSets: '3',
       exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
     });
+    this._syncPaneH();
   },
   onExNameInput(e) { this.setData({ exName: e.detail.value }); },
   onExWt(e) { this.setData({ exWt: e.detail.value }); },
@@ -837,6 +865,7 @@ Page({
         this.setData({ exLoadMode: 'fixed' });
       }
     }
+    this._syncPaneH();
   },
   // 递增组数输入：原样保存展示值（不回写输入框），同时做「即时跟随」——
   // 瞬时值一旦已是合法 1-6，立刻增删逐组行（保留已填行值），改完即见，无需等失焦。
@@ -851,6 +880,8 @@ Page({
       if (n !== (this.data.exProgRows || []).length) patch.exProgRows = this.buildProgRows(n);
     }
     this.setData(patch);
+    // 组数变化即时增删逐组行 → 递增面板实际高度已变，同步容器高度平滑伸展/收缩
+    if (patch.exProgRows) this._syncPaneH();
   },
   // 组数失焦：规范化组数输入并同步行数（保留已填的行值）
   onExProgSetsBlur() { this.syncProgSetsRows(true); },
@@ -896,6 +927,7 @@ Page({
   },
   setProgRows(n) {
     this.setData({ exProgRows: this.buildProgRows(n) });
+    this._syncPaneH();
   },
   cancelEx() { this.closeOverlay(); },
   addEx() {
@@ -982,6 +1014,7 @@ Page({
     }
     this.setData({ exDetailBurn: burnText });
     this.openModal('exDetail');
+    if (!this.data.exDetailRO) this._syncPaneH();
   },
   saveExMeta() {
     // 勾选完成后的只读视图：按钮为「知道了」，只关不改（防呆保护，不覆盖已锁定记录）
@@ -1033,6 +1066,7 @@ Page({
         exDetailBurn: '填写并勾选完成后自动估算消耗'
       });
       this.openModal('exDetail');
+      this._syncPaneH();
       this.toast('请先填写重量、组数和次数，填完保存后自动完成');
       return;
     }
