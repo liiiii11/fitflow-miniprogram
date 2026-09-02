@@ -113,9 +113,11 @@ Page({
     pageOverlay: '', modalOverlay: '', ovClosing: false,
     pageLeaving: '', pageUnder: '', pgClosing: false, pgAnim: 'push',
     exName: '', exSaving: false, exWt: '', exSets: '', exReps: '',
+    exLoadMode: 'fixed', exProgSets: '3', exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
     coName: '', coDur: '30', coBurn: '', coCalHint: '',
     confirmDelText: '',
     exDetailTitle: '', exSetWt: '', exSetSets: '', exSetReps: '', exDetailBurn: '',
+    exDetailLocked: false, exDetailProgRows: [],
     coDetailTitle: '', coDetailDur: '', coDetailBurn: '', coDetailCalHint: '',
     heatDetailTitle: '', heatDetailBody: '',
     mealTypeSel: [], manualFoodName: '', manualFoodMatch: '系统自动计算', manualFoodMatchCls: 'muted', manualFoodCalWrap: false, manualFoodCal: '',
@@ -297,16 +299,48 @@ Page({
     });
     return Math.round(total);
   },
+  // 递增方案解析：识别形如 "60kg*12→70kg*10→80kg*8" 的逐组串（段数≥2 才算递增）。
+  // 返回 [{kg,reps},...]；固定格式/自重/无 kg 的串返回 []。
+  parseProgSets(meta) {
+    const out = [];
+    const re = /(\d+(?:\.\d+)?)\s*kg\s*(?:×|\*)\s*(\d+)/gi;
+    let m;
+    while ((m = re.exec(meta || ''))) out.push({ kg: parseFloat(m[1]), reps: parseInt(m[2], 10) });
+    return out.length >= 2 ? out : [];
+  },
+  // 由递增表单行生成逐组 meta："60kg*12→70kg*10→80kg*8"
+  // 校验规则：整行(重量+次数)为空→跳过；只填一半/非法数字→报错返回；有效行<2→报错
+  buildProgMetaFromRows(rows) {
+    if (!Array.isArray(rows)) return { ok: false, err: '没有可保存的递增组' };
+    const parts = [];
+    for (let k = 0; k < rows.length; k++) {
+      const r = rows[k] || {};
+      const w = String(r.wt == null ? '' : r.wt).trim();
+      const rp = String(r.reps == null ? '' : r.reps).trim();
+      if (!w && !rp) continue; // 空行跳过
+      const wn = Number(w), rn = Number(rp);
+      if (!isFinite(wn) || wn <= 0 || !isFinite(rn) || rn <= 0) {
+        return { ok: false, err: '第' + (k + 1) + '组需填写正确的重量和次数' };
+      }
+      parts.push(wn + 'kg*' + rn);
+    }
+    if (parts.length === 0) return { ok: false, err: '请填写递增组（每组：重量 + 次数）' };
+    if (parts.length === 1) return { ok: false, err: '递增模式请至少填写 2 组，单组请用「固定」' };
+    return { ok: true, meta: parts.join('→') };
+  },
   parseKg(meta) {
     // 只认带 kg 单位的数字（历史数据重量均带 kg 后缀）；无 kg 时回退默认值，
     // 避免 "4组*12" 的 4 被误当重量
     const km = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta || '');
     return km ? parseFloat(km[1]) : 20;
   },
-  // 组数：meta 形如 "80kg×4组×12"，旧格式 "80kg×12" 无组数则默认 4
+  // 组数：meta 形如 "80kg×4组×12"，旧格式 "80kg×12" 无组数则默认 4；
+  // 递增方案 "60kg*12→70kg*10→80kg*8" 无 "N组" 字样，按逐组段数计（3 组）
   parseSets(meta) {
     const s = (meta || '').match(/(\d+)\s*组/);
     if (s) return parseInt(s[1], 10);
+    const p = this.parseProgSets(meta);
+    if (p.length) return p.length;
     return 4;
   },
   // 次数：取最后一个 ×N 或 *N（新格式为组数后的次数；旧格式 "80kg×12" 的 12 即次数）
@@ -328,10 +362,12 @@ Page({
     else if (r) parts.push('*' + r);
     return parts.join(' ');
   },
-  // 本地估算的容量系数：4组×10次为基准 1.0，随总容量缩放（0.6~2.5 封顶）
+  // 本地估算的容量系数：4组×10次为基准 1.0，随总容量缩放（0.6~2.5 封顶）；
+  // 递增方案按 Σ各组次数 计等效容量（"12+10+8" 与 3组×10 相当），避免只用末组次数低估
   volumeFactor(meta) {
-    const vol = this.parseSets(meta) * this.parseReps(meta) / 40;
-    return Math.max(0.6, Math.min(2.5, vol));
+    const prog = this.parseProgSets(meta);
+    const eff = prog.length ? prog.reduce((s, g) => s + g.reps, 0) : this.parseSets(meta) * this.parseReps(meta);
+    return Math.max(0.6, Math.min(2.5, eff / 40));
   },
   burnCacheKey(ex) {
     return (ex.name || '').trim() + '|' + this.parseKg(ex.meta) + '|' + this.parseSets(ex.meta) + '|' + this.parseReps(ex.meta);
@@ -752,17 +788,79 @@ Page({
   },
 
   // ==================== EXERCISES ====================
-  openExModal() { this.showModal('ex', { pageOverlay: '', exName: '', exWt: '', exSets: '', exReps: '' }); },
+  openExModal() {
+    this.showModal('ex', {
+      pageOverlay: '',
+      exName: '', exWt: '', exSets: '', exReps: '',
+      exLoadMode: 'fixed', exProgSets: '3',
+      exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
+    });
+  },
   onExNameInput(e) { this.setData({ exName: e.detail.value }); },
   onExWt(e) { this.setData({ exWt: e.detail.value }); },
   onExSets(e) { this.setData({ exSets: e.detail.value }); },
   onExReps(e) { this.setData({ exReps: e.detail.value }); },
+  // 固定 / 递增 填写方式切换
+  switchExMode(e) {
+    const m = e.currentTarget.dataset.m;
+    if (m !== 'fixed' && m !== 'prog') return;
+    if (m === this.data.exLoadMode) return;
+    if (m === 'prog') {
+      // 首次切到递增：沿用固定模式已填的组数与首组重量/次数，方便衔接；未填则默认 3 组
+      let n = parseInt(this.data.exSets, 10);
+      if (!(n >= 1 && n <= 6)) n = 3;
+      const rows = [];
+      for (let k = 0; k < n; k++) rows.push({ wt: '', reps: '' });
+      if (this.data.exWt) rows[0].wt = this.data.exWt;
+      if (this.data.exReps) rows[0].reps = this.data.exReps;
+      this.setData({ exLoadMode: 'prog', exProgSets: String(n), exProgRows: rows });
+    } else {
+      this.setData({ exLoadMode: 'fixed' });
+    }
+  },
+  // 递增组数变化 → 重建行（保留已填的行值）
+  onExProgSets(e) {
+    const raw = e.detail.value;
+    const n = parseInt(raw, 10);
+    if (raw === '') { this.setData({ exProgSets: '' }); return; }
+    if (n >= 1 && n <= 6) { this.setData({ exProgSets: String(n) }); this.setProgRows(n); return; }
+    // 越界输入钳制到边界并提示
+    const c = n > 6 ? 6 : 1;
+    this.setData({ exProgSets: String(c) });
+    this.setProgRows(c);
+    this.toast('递增组数需在 1-6 之间');
+  },
+  onExProgWt(e) { this.setProgCell(parseInt(e.currentTarget.dataset.i, 10), e.detail.value, null); },
+  onExProgReps(e) { this.setProgCell(parseInt(e.currentTarget.dataset.i, 10), null, e.detail.value); },
+  setProgCell(i, wt, reps) {
+    const rows = (this.data.exProgRows || []).slice();
+    if (!rows[i]) return;
+    rows[i] = { wt: wt != null ? wt : rows[i].wt, reps: reps != null ? reps : rows[i].reps };
+    this.setData({ exProgRows: rows });
+  },
+  setProgRows(n) {
+    const old = this.data.exProgRows || [];
+    const rows = [];
+    for (let k = 0; k < n; k++) {
+      const o = old[k];
+      rows.push(o ? { wt: o.wt || '', reps: o.reps || '' } : { wt: '', reps: '' });
+    }
+    this.setData({ exProgRows: rows });
+  },
   cancelEx() { this.closeOverlay(); },
   addEx() {
     const name = this.data.exName.trim();
     if (!name) { this.toast('请输入动作名称'); return; }
-    // 添加时可直接填重量/组数/次数（均可留空，之后点击动作名补填）
-    const meta = this.buildExMeta(this.data.exWt, this.data.exSets, this.data.exReps);
+    let meta = '', progCount = 0;
+    if (this.data.exLoadMode === 'prog') {
+      const r = this.buildProgMetaFromRows(this.data.exProgRows);
+      if (!r.ok) { this.toast(r.err); return; }
+      meta = r.meta;
+      progCount = meta.split('→').length;
+    } else {
+      // 添加时可直接填重量/组数/次数（均可留空，之后点击动作名补填）
+      meta = this.buildExMeta(this.data.exWt, this.data.exSets, this.data.exReps);
+    }
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days && plan.days.length > 0) {
       plan.days[this.state.currentDayIdx % plan.days.length].exercises.push({ name, meta: meta, metaDate: meta ? todayKey() : '', done: false });
@@ -775,9 +873,10 @@ Page({
       return;
     }
     this.closeOverlay();
-    this.toast('已添加: ' + name + (meta ? ' ' + meta : ''));
+    const shown = progCount ? '（' + progCount + ' 组递增方案）' : (meta ? ' ' + meta : '');
+    this.toast('已添加: ' + name + shown);
   },
-  // 点击动作名 → 设置今天的重量/次数
+  // 点击动作名 → 设置今天的重量/次数（递增方案动作为只读展示，防止单值输入覆盖）
   showExDetail(e) {
     const idx = e.currentTarget.dataset.i;
     this._exDetailIdx = idx;
@@ -786,11 +885,22 @@ Page({
     if (!exs[idx]) return;
     this.setData({ exDetailTitle: exs[idx].name });
     const meta = this.todayMeta(exs[idx]);
-    const wm = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta);
-    const sm = /(\d+)\s*组/.exec(meta);
-    const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
-    const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
-    this.setData({ exSetWt: wm ? wm[1] : '', exSetSets: sm ? sm[1] : '', exSetReps: rm ? rm[1] : '' });
+    const prog = this.parseProgSets(meta);
+    if (prog.length) {
+      // 当天填的是递增方案（多组）：3 个单值输入框回填会丢失逐组信息，故锁定编辑，
+      // 只读展示完整方案；如需调整请删除动作后按递增重新添加
+      this.setData({
+        exDetailLocked: true,
+        exSetWt: '', exSetSets: '', exSetReps: '',
+        exDetailProgRows: prog.map((g, k) => ({ label: '第' + (k + 1) + '组', text: g.kg + 'kg × ' + g.reps }))
+      });
+    } else {
+      const wm = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta);
+      const sm = /(\d+)\s*组/.exec(meta);
+      const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
+      const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
+      this.setData({ exDetailLocked: false, exDetailProgRows: [], exSetWt: wm ? wm[1] : '', exSetSets: sm ? sm[1] : '', exSetReps: rm ? rm[1] : '' });
+    }
     const ck = this.burnCacheKey(exs[idx]);
     const c = storage.getBurnCache()[ck];
     let burnText;
@@ -808,6 +918,8 @@ Page({
   onExSetSets(e) { this.setData({ exSetSets: e.detail.value }); },
   onExSetReps(e) { this.setData({ exSetReps: e.detail.value }); },
   saveExMeta() {
+    // 递增方案动作在详情弹窗为只读：按钮此时为「知道了」，只关闭不改数据
+    if (this.data.exDetailLocked) { this.closeOverlay(); return; }
     const exs = this.getCurrentExercises();
     const ex = exs[this._exDetailIdx];
     if (!ex) { this.closeOverlay(); return; }
@@ -833,7 +945,7 @@ Page({
     if (!ex.done && !this.todayMeta(ex)) {
       this._exDetailIdx = idx;
       this._exDetailFromCheck = true;
-      this.setData({ exDetailTitle: ex.name, exSetWt: '', exSetSets: '', exSetReps: '', exDetailBurn: '填写并勾选完成后自动估算消耗' });
+      this.setData({ exDetailTitle: ex.name, exSetWt: '', exSetSets: '', exSetReps: '', exDetailBurn: '填写并勾选完成后自动估算消耗', exDetailLocked: false, exDetailProgRows: [] });
       this.openModal('exDetail');
       this.toast('请先填写重量、组数和次数，填完保存后自动完成');
       return;
