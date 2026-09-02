@@ -240,10 +240,13 @@
 .fg__row { display: flex; gap: 14px; }
 .fg__row .fg { flex: 1; }
 /* 固定 / 递增 填写方式切换——滑块分段控件（纯 view、零测量）
-   选中指示由 .mode-thumb 白色胶囊在灰轨(.mode-chips)内平移承载，chip 退化为
+   选中指示由 .mode-thumb 胶囊在灰轨(.mode-chips)内平移承载，chip 退化为
    轨道内的文字层（无边框无背景）：on/off 仅文字深浅 + .18s 颜色过渡——
    选中权随滑块移交，滑行中间态两端文字都可读（深色字不反色，无 b3762ad 之前
    的药丸反白问题）。
+   thumb 用 var(--bg)（与弹窗底色同色，不用 var(--card) 纯白+阴影——白色贴片
+   感突兀，0d36dd3 后用户改口）→ 视觉是「灰轨上挖出一块底色」，低调不抢眼，
+   与补剂单位选择行(meal-type-sel .on)同套配色语言。
    轨 padding:2 + gap:2 → cell 宽恰为轨道宽/2 - 3px，thumb left:2 + 宽
    calc(50% - 3px)、位移 calc(100% + 2px) 精确落第二个 cell——纯百分比/calc，
    无需 createSelectorQuery 测量。
@@ -280,9 +283,8 @@
   position: absolute;
   top: 2px; bottom: 2px; left: 2px;
   width: calc(50% - 3px);
-  background: var(--card);
+  background: var(--bg);
   border-radius: 999px;
-  box-shadow: 0 1px 3px var(--shadow);
   transition: transform .2s cubic-bezier(.32, .72, .24, 1);
 }
 .mode-thumb.right { transform: translateX(calc(100% + 2px)); }
