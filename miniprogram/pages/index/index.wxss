@@ -239,25 +239,36 @@
 .fg__inp--md { font-size: 24px; font-weight: 600; height: 56px; }
 .fg__row { display: flex; gap: 14px; }
 .fg__row .fg { flex: 1; }
-/* 固定 / 递增 填写方式切换 */
-.mode-seg { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* 固定 / 递增 填写方式切换——分段轨道 + 滑块指示器：
+   高亮从「chip 背景瞬时变色」升级为「指示滑块在轨道上滑动」（纯 view、无 input、
+   无跨线程测量）：.mode-chips 灰轨(var(--rule))占满可用宽、两 chip flex:1 均分，
+   .mode-thumb 绝对定位于 chip1 上（left 2px 同轨道内边距、宽 calc(50% - 3px)：
+   padding 2 + gap 2 下 chip 宽恰为轨道宽/2-3）。平移距离 = chip2 左端 - chip1 左端
+   = thumb 自身宽 + 2px 间隙，故 translateX(calc(100% + 2px)) 精确定位 chip2，
+   全程百分比/calc 无需测量。文字色 on=--text/off=--muted 均深色系，与浅色滑块无
+   反色冲突，切换中间态两字都可读；滑块 .2s 与 t0 数据/chip 高亮同步起步。 */
+.mode-seg { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.mode-chips { position: relative; flex: 1; min-width: 0; display: flex; gap: 2px; padding: 2px; background: var(--rule); border-radius: 9px; }
+.mode-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 3px); background: var(--bg); border-radius: 7px; z-index: 0; pointer-events: none; transition: transform .2s cubic-bezier(.32, .72, .24, 1); }
 .mode-chip {
-  padding: 7px 22px;
-  border-radius: 999px;
-  border: 1.5px solid var(--rule);
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border-radius: 7px;
   font-size: 13px;
   color: var(--muted);
   line-height: 1.3;
-  flex-shrink: 0;
+  text-align: center;
   font-weight: 500;
-  /* 高亮仅做颜色过渡（时长短、无位移）：on/off 字重恒定（都为 500），
-     避免选中态加粗→chip 变宽→整行排布瞬时跳动的生硬感 */
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+  /* on/off 字重恒定（都为 500），避免选中加粗→chip 变宽→排布跳动；选中指示交给滑块，此处仅转文字色 */
+  transition: color .15s ease, transform .12s ease;
 }
-.mode-chip.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+.mode-chip.on { color: var(--text); }
 /* 按压即时反馈：指腹点下有轻微收缩，松手回弹（配合上面 .12s transform 过渡） */
 .chip-press { transform: scale(.93); }
-.mode-seg__tip { font-size: 11px; color: var(--muted); flex: 1; text-align: right; }
+.mode-seg__tip { font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; }
 /* 固定/递增表单切换——两段式离场/入场过渡（单表单渲染约束下的最优解）：
    t0 旧表单挂 .leaving → opacity 1→0 过渡 .1s（期间仍在树、输入值不丢）；
    t0+110ms wx:if 按 exShowMode 换内容，新表单挂载即播 exPaneFadeIn 淡入 .14s。
