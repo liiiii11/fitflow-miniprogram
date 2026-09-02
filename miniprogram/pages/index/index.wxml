@@ -382,38 +382,58 @@
 <view wx:if="{{modalOverlay==='exDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
     <view class="sheet__title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{exDetailTitle}}</view>
-    <view class="mode-seg">
-      <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
-      <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
-      <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
-    </view>
-    <block wx:if="{{exLoadMode==='fixed'}}">
-      <view class="fg__row" style="margin-top:14px">
-        <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exWt}}" bindinput="onExWt" cursor-spacing="120"/></view>
-        <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSets}}" bindinput="onExSets" cursor-spacing="120"/></view>
-        <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{exReps}}" bindinput="onExReps" cursor-spacing="120"/></view>
-      </view>
-    </block>
-    <block wx:else>
-      <view style="display:flex;align-items:flex-end;gap:12px">
-        <view class="fg" style="flex:0 0 140px;margin-bottom:6px"><text class="fg__lbl">组数 (1-6)</text><input class="fg__inp" type="number" placeholder="如 3" value="{{exProgSets}}" bindinput="onExProgSets" bindblur="onExProgSetsBlur" cursor-spacing="120"/></view>
-        <text style="font-size:11px;color:var(--muted);flex:1;padding-bottom:14px">按顺序填每组重量和次数，后一组更重即为递增</text>
-      </view>
-      <view style="border-top:1px solid var(--rule);margin-top:2px">
-        <view wx:for="{{exProgRows}}" wx:key="index" class="prog-row">
-          <text class="prog-row__idx">第{{index+1}}组</text>
-          <input class="prog-row__inp" type="digit" placeholder="重量" value="{{item.wt}}" data-i="{{index}}" bindinput="onExProgWt" cursor-spacing="120"/>
-          <text class="prog-row__x">×</text>
-          <input class="prog-row__inp" type="number" placeholder="次数" value="{{item.reps}}" data-i="{{index}}" bindinput="onExProgReps" cursor-spacing="120"/>
+    <!-- 勾选完成 → 只读查看（要改需先取消勾选） -->
+    <block wx:if="{{exDetailRO}}">
+      <view style="font-size:11px;color:var(--muted);margin-bottom:12px">已勾选完成 · 今天的训练记录已锁定，仅可查看</view>
+      <view class="ro-box">
+        <view wx:if="{{exRORows.length > 0}}">
+          <view wx:for="{{exRORows}}" wx:key="index" class="ro-row">
+            <text class="ro-row__idx">第{{index+1}}组</text>
+            <text class="ro-row__val">{{item.text}}</text>
+          </view>
         </view>
+        <view wx:else class="ro-text">{{exROText}}</view>
       </view>
-      <view style="font-size:11px;color:var(--muted);margin-top:6px">例：第1组 60×12、第2组 70×10、第3组 80×8；整行为空自动跳过</view>
+      <view style="font-size:11px;color:var(--muted);margin-top:10px">如需调整重量/组数/次数：关闭本页 → 点主页该动作的 ✓ 取消勾选 → 再点动作名修改</view>
     </block>
-    <view wx:if="{{exLoadMode==='fixed'}}" style="font-size:11px;color:var(--muted);margin-top:4px">填写今天的实际重量、组数和每组次数；换训练日后需重新填写</view>
+    <!-- 未勾选 → 可编辑（固定 / 递增双模式） -->
+    <block wx:else>
+      <view class="mode-seg">
+        <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
+        <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
+        <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
+      </view>
+      <block wx:if="{{exLoadMode==='fixed'}}">
+        <view class="fg__row" style="margin-top:14px">
+          <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{exWt}}" bindinput="onExWt" cursor-spacing="120"/></view>
+          <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{exSets}}" bindinput="onExSets" cursor-spacing="120"/></view>
+          <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{exReps}}" bindinput="onExReps" cursor-spacing="120"/></view>
+        </view>
+      </block>
+      <block wx:else>
+        <view style="display:flex;align-items:flex-end;gap:12px">
+          <view class="fg" style="flex:0 0 140px;margin-bottom:6px"><text class="fg__lbl">组数 (1-6)</text><input class="fg__inp" type="number" placeholder="如 3" value="{{exProgSets}}" bindinput="onExProgSets" bindblur="onExProgSetsBlur" cursor-spacing="120"/></view>
+          <text style="font-size:11px;color:var(--muted);flex:1;padding-bottom:14px">按顺序填每组重量和次数，后一组更重即为递增</text>
+        </view>
+        <view style="border-top:1px solid var(--rule);margin-top:2px">
+          <view wx:for="{{exProgRows}}" wx:key="index" class="prog-row">
+            <text class="prog-row__idx">第{{index+1}}组</text>
+            <input class="prog-row__inp" type="digit" placeholder="重量" value="{{item.wt}}" data-i="{{index}}" bindinput="onExProgWt" cursor-spacing="120"/>
+            <text class="prog-row__x">×</text>
+            <input class="prog-row__inp" type="number" placeholder="次数" value="{{item.reps}}" data-i="{{index}}" bindinput="onExProgReps" cursor-spacing="120"/>
+          </view>
+        </view>
+        <view style="font-size:11px;color:var(--muted);margin-top:6px">例：第1组 60×12、第2组 70×10、第3组 80×8；整行为空自动跳过</view>
+      </block>
+      <view style="font-size:11px;color:var(--muted);margin-top:4px">填写今天的实际重量、组数和每组次数；换训练日后需重新填写</view>
+    </block>
     <view style="font-size:13px;font-weight:600;color:var(--accent);margin-top:14px">{{exDetailBurn}}</view>
     <view style="display:flex;gap:12px;margin-top:22px">
-      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
-      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="saveExMeta">保存</button>
+      <button wx:if="{{exDetailRO}}" class="btn btn--pri btn--fw" bindtap="closeOverlay">知道了</button>
+      <block wx:else>
+        <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
+        <button class="btn btn--pri btn--fw" style="flex:2" bindtap="saveExMeta">保存</button>
+      </block>
     </view>
   </view>
 </view>

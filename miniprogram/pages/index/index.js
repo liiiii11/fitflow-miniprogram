@@ -117,6 +117,7 @@ Page({
     coName: '', coDur: '30', coBurn: '', coCalHint: '',
     confirmDelText: '',
     exDetailTitle: '', exDetailBurn: '',
+    exDetailRO: false, exRORows: [], exROText: '',
     coDetailTitle: '', coDetailDur: '', coDetailBurn: '', coDetailCalHint: '',
     heatDetailTitle: '', heatDetailBody: '',
     mealTypeSel: [], manualFoodName: '', manualFoodMatch: '系统自动计算', manualFoodMatchCls: 'muted', manualFoodCalWrap: false, manualFoodCal: '',
@@ -909,35 +910,47 @@ Page({
     const shown = progCount ? '（' + progCount + ' 组递增方案）' : (meta ? ' ' + meta : '');
     this.toast('已添加: ' + name + shown);
   },
-  // 点击动作名 → 设置今天的重量/次数（固定与递增两种方式均可编辑，弹窗内可随时切换）
+  // 点击动作名 → 当天重量方案：未勾选可编辑（固定/递增双模式）；
+  // 已勾选完成则只读查看（防止勾选后误改，造成记录与勾选不一致）
   showExDetail(e) {
     const idx = e.currentTarget.dataset.i;
     this._exDetailIdx = idx;
     this._exDetailFromCheck = false;
     const exs = this.getCurrentExercises();
     if (!exs[idx]) return;
-    this.setData({ exDetailTitle: exs[idx].name });
-    const meta = this.todayMeta(exs[idx]);
+    const ex = exs[idx];
+    this.setData({ exDetailTitle: ex.name });
+    const meta = this.todayMeta(ex);
     const prog = this.parseProgSets(meta);
-    if (prog.length) {
-      // 当天填的是递增方案：回填成逐组可编辑行，可继续改重量/次数，也可切回固定
+    if (ex.done) {
+      // 勾选完成 → 锁定只读：仅展示当天方案（递增逐组 / 固定原文），改需先取消勾选
       this.setData({
-        exLoadMode: 'prog',
-        exWt: '', exSets: '', exReps: '',
-        exProgSets: String(prog.length),
-        exProgRows: prog.map(g => ({ wt: String(g.kg), reps: String(g.reps) }))
+        exDetailRO: true,
+        exROText: prog.length ? '' : (meta || '当天暂无重量记录'),
+        exRORows: prog.map(g => ({ text: g.kg + ' kg × ' + g.reps }))
       });
     } else {
-      const wm = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta);
-      const sm = /(\d+)\s*组/.exec(meta);
-      const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
-      const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
-      this.setData({
-        exLoadMode: 'fixed',
-        exWt: wm ? wm[1] : '', exSets: sm ? sm[1] : '', exReps: rm ? rm[1] : '',
-        exProgSets: '3',
-        exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
-      });
+      this.setData({ exDetailRO: false, exRORows: [], exROText: '' });
+      if (prog.length) {
+        // 当天填的是递增方案：回填成逐组可编辑行，可继续改重量/次数，也可切回固定
+        this.setData({
+          exLoadMode: 'prog',
+          exWt: '', exSets: '', exReps: '',
+          exProgSets: String(prog.length),
+          exProgRows: prog.map(g => ({ wt: String(g.kg), reps: String(g.reps) }))
+        });
+      } else {
+        const wm = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta);
+        const sm = /(\d+)\s*组/.exec(meta);
+        const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
+        const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
+        this.setData({
+          exLoadMode: 'fixed',
+          exWt: wm ? wm[1] : '', exSets: sm ? sm[1] : '', exReps: rm ? rm[1] : '',
+          exProgSets: '3',
+          exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
+        });
+      }
     }
     const ck = this.burnCacheKey(exs[idx]);
     const c = storage.getBurnCache()[ck];
@@ -953,6 +966,8 @@ Page({
     this.openModal('exDetail');
   },
   saveExMeta() {
+    // 勾选完成后的只读视图：按钮为「知道了」，只关不改（防呆保护，不覆盖已锁定记录）
+    if (this.data.exDetailRO) { this.closeOverlay(); return; }
     const exs = this.getCurrentExercises();
     const ex = exs[this._exDetailIdx];
     if (!ex) { this.closeOverlay(); return; }
@@ -993,6 +1008,7 @@ Page({
       this._exDetailFromCheck = true;
       this.setData({
         exDetailTitle: ex.name,
+        exDetailRO: false, exRORows: [], exROText: '',
         exLoadMode: 'fixed', exWt: '', exSets: '', exReps: '',
         exProgSets: '3',
         exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
