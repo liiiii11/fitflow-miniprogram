@@ -1908,6 +1908,12 @@ Page({
   showModal(type, extra) {
     if (this._ovCloseTimer) { clearTimeout(this._ovCloseTimer); this._ovCloseTimer = null; }
     const patch = Object.assign({ modalOverlay: type, ovClosing: false }, extra || {});
+    // 固定/递增双面板弹窗（添加训练 / 动作设置可编辑态）每次打开都把容器高度复位为 0，
+    // 由 _syncPaneH 在渲染后测得真实高度再撑开（0→h 过渡被 sheet 入场动画掩盖）。
+    // 否则上次关闭时残留的 exPaneH（可能来自另一弹窗/另一模式的 6 行高面板）会让本次打开
+    // 首帧容器过高（内容只占顶部、下方留白/按钮区被推远）或过矮（overflow hidden 裁掉内容），
+    // 随后才被修正 —— 表现为弹窗打开瞬间高度跳变。
+    if ((type === 'ex' || type === 'exDetail') && patch.exPaneH == null) patch.exPaneH = 0;
     this.setData(patch);
   },
   openModal(e) {
