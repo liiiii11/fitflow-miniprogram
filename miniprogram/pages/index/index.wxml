@@ -290,7 +290,7 @@
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
     <view class="sheet__title">添加训练</view>
     <view class="fg"><text class="fg__lbl">动作</text><input class="fg__inp" placeholder="动作名称" value="{{exName}}" bindinput="onExNameInput" cursor-spacing="120"/></view>
-    <template is="exFormFields"/>
+    <template is="exFormFields"></template>
     <view wx:if="{{exLoadMode==='fixed'}}" style="font-size:11px;color:var(--muted);margin-top:4px">三项均可留空，稍后也可点击主页动作名修改</view>
     <view style="display:flex;gap:12px;margin-top:22px">
       <button class="btn btn--ghost" style="flex:1" bindtap="cancelEx">取消</button>
@@ -356,7 +356,7 @@
 <view wx:if="{{modalOverlay==='exDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" style="bottom:{{keyboardH}}px;{{sheetMaxH?'max-height:'+sheetMaxH+';':''}}" catchtap>
     <view class="sheet__title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{exDetailTitle}}</view>
-    <template is="exFormFields"/>
+    <template is="exFormFields"></template>
     <view wx:if="{{exLoadMode==='fixed'}}" style="font-size:11px;color:var(--muted);margin-top:4px">填写今天的实际重量、组数和每组次数；换训练日后需重新填写</view>
     <view style="font-size:13px;font-weight:600;color:var(--accent);margin-top:14px">{{exDetailBurn}}</view>
     <view style="display:flex;gap:12px;margin-top:22px">
@@ -530,8 +530,8 @@
 <!-- 固定 / 递增 填写表单（「添加训练」与「动作设置」共用同一状态：exLoadMode/exWt/exSets/exReps/exProgSets/exProgRows） -->
 <template name="exFormFields">
   <view class="mode-seg">
-    <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" bindtap="switchExMode">固定</view>
-    <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" bindtap="switchExMode">递增</view>
+    <view class="mode-chip {{exLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchExMode">固定</view>
+    <view class="mode-chip {{exLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchExMode">递增</view>
     <text class="mode-seg__tip">{{exLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
   </view>
   <block wx:if="{{exLoadMode==='fixed'}}">

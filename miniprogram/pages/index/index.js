@@ -801,7 +801,7 @@ Page({
   onExReps(e) { this.setData({ exReps: e.detail.value }); },
   // 固定 / 递增 填写方式切换
   switchExMode(e) {
-    const m = e.currentTarget.dataset.m;
+    const m = (e && e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.m : '';
     if (m !== 'fixed' && m !== 'prog') return;
     if (m === this.data.exLoadMode) return;
     if (m === 'prog') {
