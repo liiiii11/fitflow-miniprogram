@@ -271,12 +271,6 @@
 }
 .prog-row__inp:focus { border-color: var(--text); }
 .prog-row__x { font-size: 14px; color: var(--muted); flex-shrink: 0; }
-/* 递增方案只读展示（动作详情） */
-.ex-lockbox { margin-top: 2px; border: 1px solid var(--rule); border-radius: 12px; padding: 2px 14px; background: var(--card); }
-.ex-lockbox__row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
-.ex-lockbox__row:last-child { border-bottom: none; }
-.ex-lockbox__idx { font-size: 12px; color: var(--muted); }
-.ex-lockbox__val { font-weight: 600; color: var(--text); }
 .btn { display: inline-flex; align-items: center; justify-content: center; padding: 14px 28px; font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
 .btn:active { opacity: .6; }
 .btn--pri { background: var(--text); color: var(--bg); border-radius: 11px; }

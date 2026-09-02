@@ -116,8 +116,7 @@ Page({
     exLoadMode: 'fixed', exProgSets: '3', exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
     coName: '', coDur: '30', coBurn: '', coCalHint: '',
     confirmDelText: '',
-    exDetailTitle: '', exSetWt: '', exSetSets: '', exSetReps: '', exDetailBurn: '',
-    exDetailLocked: false, exDetailProgRows: [],
+    exDetailTitle: '', exDetailBurn: '',
     coDetailTitle: '', coDetailDur: '', coDetailBurn: '', coDetailCalHint: '',
     heatDetailTitle: '', heatDetailBody: '',
     mealTypeSel: [], manualFoodName: '', manualFoodMatch: '系统自动计算', manualFoodMatchCls: 'muted', manualFoodCalWrap: false, manualFoodCal: '',
@@ -806,16 +805,32 @@ Page({
     if (m !== 'fixed' && m !== 'prog') return;
     if (m === this.data.exLoadMode) return;
     if (m === 'prog') {
+      // 已填过的递增行原样保留（详情/添加中来回切换不丢已填组）；
       // 首次切到递增：沿用固定模式已填的组数与首组重量/次数，方便衔接；未填则默认 3 组
-      let n = parseInt(this.data.exSets, 10);
-      if (!(n >= 1 && n <= 6)) n = 3;
-      const rows = [];
-      for (let k = 0; k < n; k++) rows.push({ wt: '', reps: '' });
-      if (this.data.exWt) rows[0].wt = this.data.exWt;
-      if (this.data.exReps) rows[0].reps = this.data.exReps;
-      this.setData({ exLoadMode: 'prog', exProgSets: String(n), exProgRows: rows });
+      const hadRows = (this.data.exProgRows || []).some(r => (String(r.wt || '').trim() !== '') || (String(r.reps || '').trim() !== ''));
+      if (!hadRows) {
+        let n = parseInt(this.data.exSets, 10);
+        if (!(n >= 1 && n <= 6)) n = 3;
+        const rows = [];
+        for (let k = 0; k < n; k++) rows.push({ wt: '', reps: '' });
+        if (this.data.exWt) rows[0].wt = this.data.exWt;
+        if (this.data.exReps) rows[0].reps = this.data.exReps;
+        this.setData({ exLoadMode: 'prog', exProgSets: String(n), exProgRows: rows });
+      } else {
+        this.setData({ exLoadMode: 'prog' });
+      }
     } else {
-      this.setData({ exLoadMode: 'fixed' });
+      // 切回固定：若固定输入框为空但已有递增行，用首组重量/次数 + 总组数兜底，避免空表单
+      const rows = this.data.exProgRows || [];
+      const fixedEmpty = !String(this.data.exWt || '').trim() && !String(this.data.exSets || '').trim() && !String(this.data.exReps || '').trim();
+      if (fixedEmpty && rows.some(r => String(r.wt || '').trim() !== '')) {
+        const ps = parseInt(this.data.exProgSets, 10);
+        const sn = (ps >= 1 && ps <= 6) ? ps : rows.length;
+        const first = rows[0] || {};
+        this.setData({ exLoadMode: 'fixed', exWt: first.wt || '', exSets: String(sn), exReps: first.reps || '' });
+      } else {
+        this.setData({ exLoadMode: 'fixed' });
+      }
     }
   },
   // 递增组数变化 → 重建行（保留已填的行值）
@@ -876,7 +891,7 @@ Page({
     const shown = progCount ? '（' + progCount + ' 组递增方案）' : (meta ? ' ' + meta : '');
     this.toast('已添加: ' + name + shown);
   },
-  // 点击动作名 → 设置今天的重量/次数（递增方案动作为只读展示，防止单值输入覆盖）
+  // 点击动作名 → 设置今天的重量/次数（固定与递增两种方式均可编辑，弹窗内可随时切换）
   showExDetail(e) {
     const idx = e.currentTarget.dataset.i;
     this._exDetailIdx = idx;
@@ -887,19 +902,24 @@ Page({
     const meta = this.todayMeta(exs[idx]);
     const prog = this.parseProgSets(meta);
     if (prog.length) {
-      // 当天填的是递增方案（多组）：3 个单值输入框回填会丢失逐组信息，故锁定编辑，
-      // 只读展示完整方案；如需调整请删除动作后按递增重新添加
+      // 当天填的是递增方案：回填成逐组可编辑行，可继续改重量/次数，也可切回固定
       this.setData({
-        exDetailLocked: true,
-        exSetWt: '', exSetSets: '', exSetReps: '',
-        exDetailProgRows: prog.map((g, k) => ({ label: '第' + (k + 1) + '组', text: g.kg + 'kg × ' + g.reps }))
+        exLoadMode: 'prog',
+        exWt: '', exSets: '', exReps: '',
+        exProgSets: String(prog.length),
+        exProgRows: prog.map(g => ({ wt: String(g.kg), reps: String(g.reps) }))
       });
     } else {
       const wm = /(\d+(?:\.\d+)?)\s*kg/i.exec(meta);
       const sm = /(\d+)\s*组/.exec(meta);
       const xs = (meta || '').match(/(?:×|\*)\s*(\d+)/g);
       const rm = (xs && xs.length) ? /(\d+)/.exec(xs[xs.length - 1]) : null;
-      this.setData({ exDetailLocked: false, exDetailProgRows: [], exSetWt: wm ? wm[1] : '', exSetSets: sm ? sm[1] : '', exSetReps: rm ? rm[1] : '' });
+      this.setData({
+        exLoadMode: 'fixed',
+        exWt: wm ? wm[1] : '', exSets: sm ? sm[1] : '', exReps: rm ? rm[1] : '',
+        exProgSets: '3',
+        exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }]
+      });
     }
     const ck = this.burnCacheKey(exs[idx]);
     const c = storage.getBurnCache()[ck];
@@ -914,17 +934,21 @@ Page({
     this.setData({ exDetailBurn: burnText });
     this.openModal('exDetail');
   },
-  onExSetWt(e) { this.setData({ exSetWt: e.detail.value }); },
-  onExSetSets(e) { this.setData({ exSetSets: e.detail.value }); },
-  onExSetReps(e) { this.setData({ exSetReps: e.detail.value }); },
   saveExMeta() {
-    // 递增方案动作在详情弹窗为只读：按钮此时为「知道了」，只关闭不改数据
-    if (this.data.exDetailLocked) { this.closeOverlay(); return; }
     const exs = this.getCurrentExercises();
     const ex = exs[this._exDetailIdx];
     if (!ex) { this.closeOverlay(); return; }
-    ex.meta = this.buildExMeta(this.data.exSetWt, this.data.exSetSets, this.data.exSetReps);
-    ex.metaDate = ex.meta ? todayKey() : '';
+    let meta;
+    if (this.data.exLoadMode === 'prog') {
+      // 递增：按逐组行校验并生成方案（不足 2 组会拒绝，避免退化成单组丢中间重量）
+      const r = this.buildProgMetaFromRows(this.data.exProgRows);
+      if (!r.ok) { this.toast(r.err); return; }
+      meta = r.meta;
+    } else {
+      meta = this.buildExMeta(this.data.exWt, this.data.exSets, this.data.exReps);
+    }
+    ex.meta = meta;
+    ex.metaDate = meta ? todayKey() : '';
     if (this._exDetailFromCheck) {
       ex.done = !!this.todayMeta(ex);
       this._exDetailFromCheck = false;
@@ -945,7 +969,13 @@ Page({
     if (!ex.done && !this.todayMeta(ex)) {
       this._exDetailIdx = idx;
       this._exDetailFromCheck = true;
-      this.setData({ exDetailTitle: ex.name, exSetWt: '', exSetSets: '', exSetReps: '', exDetailBurn: '填写并勾选完成后自动估算消耗', exDetailLocked: false, exDetailProgRows: [] });
+      this.setData({
+        exDetailTitle: ex.name,
+        exLoadMode: 'fixed', exWt: '', exSets: '', exReps: '',
+        exProgSets: '3',
+        exProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+        exDetailBurn: '填写并勾选完成后自动估算消耗'
+      });
       this.openModal('exDetail');
       this.toast('请先填写重量、组数和次数，填完保存后自动完成');
       return;
