@@ -437,11 +437,15 @@ Page({
         }
         const cache2 = storage.getBurnCache();
         let changed = false;
-        r.list.forEach(item => {
-          const ex = need.find(e => e.name === item.name) || need[0];
+        r.list.forEach((item, i) => {
+          // 优先按「同序同名」匹配（AI 按请求顺序逐项返回）；乱序则退而按名字匹配，
+          // 找不到（多余项/改名）直接跳过——绝不回退 need[0]，否则同名不同组动作
+          // 的消耗会错写到第一项缓存 key，第二项永远等不到 AI 校准值
+          if (!item || !(item.kcal > 0)) return;
+          const ex = (need[i] && need[i].name === item.name) ? need[i] : need.find(e => e.name === item.name);
           if (!ex) return;
           const ck = this.burnCacheKey(ex);
-          if (cache2[ck] == null && item.kcal > 0) { cache2[ck] = item.kcal; changed = true; }
+          if (cache2[ck] == null) { cache2[ck] = item.kcal; changed = true; }
         });
         // AI 未覆盖到的动作也本地兜底
         const missing = need.filter(ex => cache2[this.burnCacheKey(ex)] == null);
@@ -1952,6 +1956,8 @@ Page({
   showHeatDetail(e) {
     const dateStr = e.currentTarget.dataset.ds;
     if (!dateStr) return;
+    // 未来日期格子（当月今天之后的占位）不可查看：直接忽略，避免弹出误导性的「休息日」
+    if (dateStr > todayKey()) return;
     const parts = dateStr.split('-');
     const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
     const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
