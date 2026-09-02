@@ -834,10 +834,20 @@ Page({
       }
     }
   },
-  // 递增组数输入：仅原样存入，不在输入过程中校验/重建/钳制。
-  // 否则正常编辑（如把 6 改成 2：光标前移先输 2 → "26"）会被逐键钳制回写、
-  // 行数跳动，表现为输入框被强制改写、数据错乱。统一放到失焦/保存时规范化。
-  onExProgSets(e) { this.setData({ exProgSets: e.detail.value }); },
+  // 递增组数输入：原样保存展示值（不回写输入框），同时做「即时跟随」——
+  // 瞬时值一旦已是合法 1-6，立刻增删逐组行（保留已填行值），改完即见，无需等失焦。
+  // 中间态（空 / 多位越界如 "26"、"52"）保持行数不动，避免把 6→2 先输 2 成 "26"
+  // 这类过程强制改写或行数跳动（b5b3e7b 逐键钳制抖动坑）；最终由失焦兜底规范化。
+  onExProgSets(e) {
+    const v = e.detail.value;
+    const patch = { exProgSets: v };
+    const raw = String(v == null ? '' : v).trim();
+    if (/^[1-6]$/.test(raw)) {
+      const n = parseInt(raw, 10);
+      if (n !== (this.data.exProgRows || []).length) patch.exProgRows = this.buildProgRows(n);
+    }
+    this.setData(patch);
+  },
   // 组数失焦：规范化组数输入并同步行数（保留已填的行值）
   onExProgSetsBlur() { this.syncProgSetsRows(true); },
   // 规范化组数显示与逐组行数一致：
@@ -870,14 +880,18 @@ Page({
     if (reps != null) patch['exProgRows[' + i + '].reps'] = reps;
     this.setData(patch);
   },
-  setProgRows(n) {
+  // 按 n 组构造逐组行：保留已有行已填值（前 n 行截断 / 不足补空行）
+  buildProgRows(n) {
     const old = this.data.exProgRows || [];
     const rows = [];
     for (let k = 0; k < n; k++) {
       const o = old[k];
-      rows.push(o ? { wt: o.wt || '', reps: o.reps || '' } : { wt: '', reps: '' });
+      rows.push(o ? { wt: String(o.wt == null ? '' : o.wt), reps: String(o.reps == null ? '' : o.reps) } : { wt: '', reps: '' });
     }
-    this.setData({ exProgRows: rows });
+    return rows;
+  },
+  setProgRows(n) {
+    this.setData({ exProgRows: this.buildProgRows(n) });
   },
   cancelEx() { this.closeOverlay(); },
   addEx() {
