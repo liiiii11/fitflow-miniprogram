@@ -810,8 +810,9 @@ Page({
   onExReps(e) { this.setData({ exReps: e.detail.value }); },
   // 固定 / 递增 填写方式切换：两段式过渡，避免 wx:if 瞬切（无过渡帧、观感干）。
   //   t0：exLoadMode 与数据迁移立即生效 → chip 高亮即时平滑变色；旧表单进入离场态
-  //       （.ex-pane.leaving 0.1s 淡出，期间内容仍是旧模式，输入框仍在树、值不丢）。
-  //   t0+110ms：exShowMode 切到新模式 → wx:if 卸载旧表单、挂载新表单（0.14s 淡入）。
+  //       （.ex-pane.leaving 0.08s 淡出，期间内容仍是旧模式，输入框仍在树、值不丢）。
+  //   t0+90ms：exShowMode 切到新模式 → wx:if 卸载旧表单、挂载新表单（0.18s 淡入；
+  //       淡入加长以吸收原生 input 群重建帧，真机不显蹦出——工具模拟器测不出该开销）。
   // 全程单份输入框在树（不重蹈 46ff263 双面板 16 个原生 input 常驻的真机卡顿）。
   // 动画中再次点击：跳帧收敛（把 exShowMode 立即收到当前 exLoadMode）再开新一轮，不吞点击。
   switchExMode(e) {
@@ -858,9 +859,9 @@ Page({
     const self = this;
     this._exSwitchT = setTimeout(() => {
       self._exSwitchT = null;
-      // 离场结束：内容切到新模式（新表单挂载即淡入），复位离场态
+      // 离场淡出(0.08s)结束后再等一小段：确保旧表单不可见后才换内容
       self.setData({ exShowMode: m, exPaneLeaving: false });
-    }, 110);
+    }, 90);
   },
   // 递增组数输入：原样保存展示值（不回写输入框），同时做「即时跟随」——
   // 瞬时值一旦已是合法 1-6，立刻增删逐组行（保留已填行值），改完即见，无需等失焦。
