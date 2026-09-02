@@ -258,16 +258,17 @@
 /* 按压即时反馈：指腹点下有轻微收缩，松手回弹（配合上面 .12s transform 过渡） */
 .chip-press { transform: scale(.93); }
 .mode-seg__tip { font-size: 11px; color: var(--muted); flex: 1; text-align: right; }
-/* 固定/递增表单切换——两段式离场/入场过渡（单表单渲染约束下的最优解）：
-   t0 旧表单挂 .leaving → opacity 1→0 过渡 .08s（期间仍在树、输入值不丢）；
-   t0+90ms wx:if 按 exShowMode 换内容，新表单挂载即播 exPaneFadeIn 淡入 .18s。
-   离场刻意比入场短（减少内容空窗）；入场淡入刻意加长——wx:if 挂载新表单要
-   一次性创建整组原生 input（固定 3 / 递增最多 13），挂载帧在真机有重建开销
-   （工具模拟器测不出），长淡入让该重建帧落在 opacity 低段，不表现为「蹦出」。
-   仅 opacity、无 transform/位移：既保留「去→来」的过程感，又不翻倍原生 input
-   （46ff263 双面板 16 个 input 常驻的真机卡顿教训）、不引位移动画下原生组件的渲染异常。 */
-.ex-pane { animation: exPaneFadeIn .18s ease-out; }
-.ex-pane.leaving { animation: none; opacity: 0; transition: opacity .08s ease; }
+/* 固定/递增表单切换——常驻双表单 + display 显隐（零重建）：
+   固定面板常驻弹窗内；递增面板懒挂载（exProgMounted）后也常驻。
+   切换只改 exShowMode → 非活动面板挂 .ex-pane-hide（display:none，原生 input
+   不渲染不占位），活动面板正常显示。input 实例永不销毁/重建 → 真机无 wx:if
+   整树重建帧（固定 3 / 递增最多 13 个原生组件的销毁+创建，此前真机卡顿与
+   placeholder 灰字后出的根因），灰字随面板同帧出现。
+   活动面板保留 .12s opacity 淡入：显隐切换时 input 已在树、无创建竞争，纯
+   view 层过渡不抢渲染线程（46ff263 双面板叠化 16 input 常驻卡顿的教训——
+   本方案非活动面板 display:none，任意时刻仅一面板 input 参与渲染）。 */
+.ex-pane { animation: exPaneFadeIn .12s ease-out; }
+.ex-pane-hide { display: none; }
 @keyframes exPaneFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
