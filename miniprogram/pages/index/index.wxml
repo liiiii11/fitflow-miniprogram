@@ -394,7 +394,7 @@
 <view wx:if="{{modalOverlay==='reward'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
     <view class="sheet__title">打赏支持</view>
-    <view style="font-size:12px;color:var(--muted);margin:-4px 0 18px">你的鼓励是 FitFlow 持续更新的动力</view>
+    <view style="font-size:12px;color:var(--muted);margin:-4px 0 18px">你的鼓励是《为了变帅》持续更新的动力</view>
     <view class="rw-tiers">
       <view wx:for="{{rewardTiers}}" wx:key="tier" class="rw-tier" hover-class="rw-tier--press" hover-start-time="20" data-tier="{{item.tier}}" bindtap="pickReward">
         <text class="rw-tier__price">¥{{item.price}}</text>
