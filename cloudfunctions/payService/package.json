@@ -1,7 +1,7 @@
 {
   "name": "payService",
   "version": "1.0.0",
-  "description": "FitFlow 打赏虚拟支付：sign 生成下单签名 / confirm 对账",
+  "description": "《为了变帅》打赏虚拟支付：sign 生成下单签名 / confirm 对账",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

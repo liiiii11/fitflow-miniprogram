@@ -1,4 +1,4 @@
-// pages/index/index.js - FitFlow 单页逻辑（完整还原原版 index.html）
+// pages/index/index.js - 《为了变帅》单页逻辑（完整还原原版 index.html）
 const storage = require('../../utils/storage.js');
 const ai = require('../../utils/ai.js');
 const { FOOD_DB, FOOD_CN, MET_TABLE } = require('../../utils/food-db.js');
@@ -1894,13 +1894,13 @@ Page({
   // 否则转发入口不会出现，表现为「小程序无法转发」。
   onShareAppMessage() {
     return {
-      title: 'FitFlow · 今天你练了吗？',
+      title: '《为了变帅》 · 今天你练了吗？',
       path: 'pages/index/index'
     };
   },
   // 朋友圈分享：定义该函数后，右上角「…」菜单即出现「分享到朋友圈」入口
   onShareTimeline() {
-    return { title: 'FitFlow · 今日训练打卡' };
+    return { title: '《为了变帅》 · 今日训练打卡' };
   },
 
   // ==================== OVERLAY HELPERS ====================
@@ -2267,7 +2267,7 @@ Page({
   },
   onAbout() {
     wx.showModal({
-      title: 'FitFlow',
+      title: '《为了变帅》',
       content: '我是彭于晏 · 训练饮食记录\n\n训练计划 · 热量追踪 · AI 消耗估算',
       showCancel: false,
       confirmText: '知道了'

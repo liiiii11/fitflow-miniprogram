@@ -1,4 +1,4 @@
-// app.js - FitFlow 小程序全局逻辑
+// app.js - 《为了变帅》小程序全局逻辑
 App({
   globalData: {
     // 云开发环境 ID（微信开发者工具 → 云开发 → 环境设置）

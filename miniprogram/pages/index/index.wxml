@@ -1,4 +1,4 @@
-<!-- pages/index/index.wxml - FitFlow 单页（完整还原原版 index.html 结构） -->
+<!-- pages/index/index.wxml - 《为了变帅》单页（完整还原原版 index.html 结构） -->
 <!-- 拖动排序时锁定页面滚动 -->
 <page-meta page-style="{{exDragIdx>=0 ? 'overflow: hidden;' : ''}}"/>
 <view class="app" style="padding-top:{{safeTop}}px">

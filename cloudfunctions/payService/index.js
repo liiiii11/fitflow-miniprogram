@@ -1,4 +1,4 @@
-// payService 云函数 —— FitFlow 打赏（虚拟支付·道具直购）服务端
+// payService 云函数 —— 《为了变帅》打赏（虚拟支付·道具直购）服务端
 // 职责：
 //   action=sign    用 wx.login 的 code 换 session_key，组装 signData 并完成双重签名，
 //                  返回前端 wx.requestVirtualPayment 所需的全部参数

@@ -1,7 +1,7 @@
 {
   "name": "aiProxy",
   "version": "1.0.0",
-  "description": "FitFlow AI 代理云函数 - 智谱 GLM-4-Flash（key 存于环境变量，前端不接触）",
+  "description": "《为了变帅》AI 代理云函数 - 智谱 GLM-4-Flash（key 存于环境变量，前端不接触）",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

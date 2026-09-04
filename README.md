@@ -1,4 +1,4 @@
-# FitFlow 健身追踪小程序
+# 《为了变帅》健身追踪小程序
 
 从 Web 版迁移而来的微信小程序，技术栈：**微信云开发 + 智谱 GLM-4-Flash**。
 单页应用（`pages/index`），数据存本地 `wx.storage`，AI 调用走云函数 `aiProxy`。

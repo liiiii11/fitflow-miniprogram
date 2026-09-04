@@ -1,4 +1,4 @@
-// utils/storage.js - 本地存储封装，等价原版 FitFlow 的 localStorage 多 key 逻辑
+// utils/storage.js - 本地存储封装，等价原版《为了变帅》的 localStorage 多 key 逻辑
 const KEYS = {
   STATE: 'STORAGE_KEY',        // 主数据：完整 app state（等价原版 fitflow_data_v2）
   FOOD_CACHE: 'FOOD_CACHE_KEY',// 食物热量缓存 { name: { name, cal, sub } }
