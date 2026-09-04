@@ -210,7 +210,7 @@
   <view wx:if="{{!hideReward}}" class="reward-entry" bindtap="openReward" hover-class="reward-entry--press" hover-start-time="20">
     <view style="display:flex;flex-direction:column;gap:2px">
       <text style="font-size:14px;font-weight:500;color:var(--text)">请作者喝杯咖啡 ☕</text>
-      <text style="font-size:11px;color:var(--muted)">FitFlow 持续免费更新，靠你的支持运转</text>
+      <text style="font-size:11px;color:var(--muted)">《为了变帅》持续免费更新，靠你的支持运转</text>
     </view>
     <text class="reward-entry__go">打赏</text>
   </view>
