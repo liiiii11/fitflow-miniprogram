@@ -1962,9 +1962,19 @@ Page({
                 reset();
                 const msg = (f && f.errMsg) || '';
                 if (f && (f.errCode === -1 || /cancel/i.test(msg))) return; // 用户主动取消：静默不报错
-                // 透出 errMsg 细节（如 IOS_ORDER_PRICE_TOO_LOW / OFFER_ID_INVALID），否则 -15001 等错误无从排查
-                const detail = msg.replace(/^requestVirtualPayment\s*:\s*fail\s*/i, '').trim();
+                // 透出 errMsg 细节（如 IOS_ORDER_PRICE_TOO_LOW / OFFER_ID_INVALID / 商户号未绑定），否则 -15001 无从排查
+                console.error('[pay] requestVirtualPayment fail', f);
+                let detail = msg.replace(/^requestVirtualPayment\s*:\s*fail\s*/i, '').trim();
+                if (!detail && f) { // errMsg 缺失时兜底：拼出回调对象全部可用字段
+                  try {
+                    const keep = {};
+                    Object.keys(f).forEach(k => { if (typeof f[k] !== 'function') keep[k] = f[k]; });
+                    detail = JSON.stringify(keep);
+                  } catch (e) { detail = String(f); }
+                }
+                if (detail.length > 400) detail = detail.slice(0, 400) + '…';
                 this.setData({ rewardErr: '支付未完成（' + f.errCode + '）' + (detail ? '：' + detail : '') });
+                wx.showModal({ title: '支付失败（' + f.errCode + '）', content: detail || '无更多错误信息，请查看控制台日志', showCancel: false, confirmText: '知道了' });
               }
             });
           },
