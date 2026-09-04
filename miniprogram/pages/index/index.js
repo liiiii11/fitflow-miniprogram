@@ -140,8 +140,8 @@ Page({
     growthText: '', growthBars: [], growthHasRefresh: false, growthLoading: false,
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
     aiStatus: 'AI 查询',
-    // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致
-    hideReward: false, rewardBusy: false, rewardErr: '',
+    // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致；iOS 已开通苹果 IAP，双端显示
+    rewardBusy: false, rewardErr: '',
     rewardTiers: [
       { tier: 'r3', price: '3', label: '小心意' },
       { tier: 'r8', price: '8', label: '请喝咖啡' },
@@ -153,8 +153,6 @@ Page({
   onLoad() {
     const sys = wx.getSystemInfoSync();
     this.setData({ safeTop: (sys.statusBarHeight || 20) + 12 });
-    // iOS 未开通苹果 IAP 前隐藏打赏入口（后台开通 IAP 并放开后删除此行即可）
-    this.setData({ hideReward: sys.platform === 'ios' });
     this.state = loadState();
     this.checkDailyReset();
     this.initDate();
