@@ -392,3 +392,41 @@
   text-overflow: ellipsis;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+/* ==================== 打赏（虚拟支付 · 道具直购） ==================== */
+/* 「我的」页入口行：左文案右胶囊按钮，按压整行轻灰反馈 */
+.reward-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-radius: 10px;
+}
+.reward-entry--press { background: rgba(0,0,0,.035); }
+.reward-entry__go {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--rule);
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+/* 打赏弹窗三档金额卡：等分横排，按压轻填充（无选中态——点击即拉起支付） */
+.rw-tiers { display: flex; gap: 10px; }
+.rw-tier {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 0 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 12px;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.rw-tier--press { background: var(--rule); border-color: var(--muted); }
+.rw-tier__price { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.2; }
+.rw-tier__label { font-size: 11px; color: var(--muted); }

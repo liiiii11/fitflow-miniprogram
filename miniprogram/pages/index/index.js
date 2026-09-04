@@ -140,12 +140,21 @@ Page({
     growthText: '', growthBars: [], growthHasRefresh: false, growthLoading: false,
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
     aiStatus: 'AI 查询',
+    // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致
+    hideReward: false, rewardBusy: false, rewardErr: '',
+    rewardTiers: [
+      { tier: 'r3', price: '3', label: '小心意' },
+      { tier: 'r8', price: '8', label: '请喝咖啡' },
+      { tier: 'r18', price: '18', label: '请吃一顿' }
+    ],
     toast: '', toastShow: false
   },
 
   onLoad() {
     const sys = wx.getSystemInfoSync();
     this.setData({ safeTop: (sys.statusBarHeight || 20) + 12 });
+    // iOS 未开通苹果 IAP 前隐藏打赏入口（后台开通 IAP 并放开后删除此行即可）
+    this.setData({ hideReward: sys.platform === 'ios' });
     this.state = loadState();
     this.checkDailyReset();
     this.initDate();
@@ -1917,6 +1926,53 @@ Page({
       this._ovCloseTimer = null;
       if (this.data.ovClosing) this.setData({ modalOverlay: '', ovClosing: false });
     }, 240);
+  },
+
+  // ==================== 打赏（虚拟支付 · 道具直购） ====================
+  // 链路：wx.login 取 code → 云函数 payService/sign（服务端持 AppKey 签名，前端永不接触密钥）
+  //       → wx.requestVirtualPayment 拉起支付 → 云函数 confirm 对账（非阻塞，打赏无实物发货）。
+  // 档位 productId/价格(分) 必须与「道具管理」后台、云函数 TIERS 三处一致。
+  openReward() { this.showModal('reward'); },
+  pickReward(e) {
+    const tier = e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset.tier : '';
+    if (!this.data.rewardTiers.some(t => t.tier === tier)) return;
+    if (this.data.rewardBusy) return; // 支付进行中防重复点击
+    this.setData({ rewardBusy: true, rewardErr: '' });
+    const reset = () => this.setData({ rewardBusy: false });
+    wx.login({
+      success: r => {
+        if (!r || !r.code) { this.setData({ rewardErr: '微信登录失败，请重试' }); reset(); return; }
+        wx.cloud.callFunction({
+          name: 'payService',
+          data: { action: 'sign', code: r.code, tier },
+          success: res => {
+            const d = (res && res.result) || {};
+            if (!d.ok || !d.signData) { this.setData({ rewardErr: d.msg || '下单失败，请稍后重试' }); reset(); return; }
+            wx.requestVirtualPayment({
+              signData: d.signData,
+              paySig: d.paySig,
+              signature: d.signature,
+              mode: d.mode || 'short_series_goods',
+              success: () => {
+                reset();
+                this.closeOverlay();
+                wx.showToast({ title: '感谢支持，请我喝杯咖啡吧 ❤', icon: 'none', duration: 2400 });
+                // 对账不阻塞 UI：确认订单状态仅作记录，失败不影响致谢
+                wx.cloud.callFunction({ name: 'payService', data: { action: 'confirm', outTradeNo: d.outTradeNo } });
+              },
+              fail: f => {
+                reset();
+                const msg = (f && f.errMsg) || '';
+                if (f && (f.errCode === -1 || /cancel/i.test(msg))) return; // 用户主动取消：静默不报错
+                this.setData({ rewardErr: '支付未完成，请稍后重试' + (f && f.errCode ? '（' + f.errCode + '）' : '') });
+              }
+            });
+          },
+          fail: () => { this.setData({ rewardErr: '网络异常，请稍后重试' }); reset(); }
+        });
+      },
+      fail: () => { this.setData({ rewardErr: '微信登录失败，请重试' }); reset(); }
+    });
   },
 
   // ==================== PROGRESS PAGE ====================

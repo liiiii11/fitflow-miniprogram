@@ -206,6 +206,15 @@
   <view class="pg-row"><text>体重</text><text><text style="font-size:16px;font-weight:600">{{weightVal}}</text> kg <text style="font-size:11px;color:var(--accent)">{{weightDiff}}</text></text></view>
   <view class="pg-row"><text>体脂率</text><text><text style="font-size:16px;font-weight:600">{{bodyFatVal}}</text>% <text style="font-size:11px;color:var(--accent)">{{bodyFatDiff}}</text></text></view>
 
+  <view class="sec-title" style="margin-top:24px">支持开发者</view>
+  <view wx:if="{{!hideReward}}" class="reward-entry" bindtap="openReward" hover-class="reward-entry--press" hover-start-time="20">
+    <view style="display:flex;flex-direction:column;gap:2px">
+      <text style="font-size:14px;font-weight:500;color:var(--text)">请作者喝杯咖啡 ☕</text>
+      <text style="font-size:11px;color:var(--muted)">FitFlow 持续免费更新，靠你的支持运转</text>
+    </view>
+    <text class="reward-entry__go">打赏</text>
+  </view>
+
   <view class="sec-title" style="margin-top:24px">数据管理</view>
   <button class="btn btn--fw btn--danger" bindtap="resetAllData">清空所有数据</button>
 </view>
@@ -378,6 +387,23 @@
       <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">取消</button>
       <button class="btn btn--fw btn--danger-solid" style="flex:2" bindtap="doDelConfirm">删除</button>
     </view>
+  </view>
+</view>
+
+<!-- 打赏（虚拟支付 · 道具直购） -->
+<view wx:if="{{modalOverlay==='reward'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view class="sheet__title">打赏支持</view>
+    <view style="font-size:12px;color:var(--muted);margin:-4px 0 18px">你的鼓励是 FitFlow 持续更新的动力</view>
+    <view class="rw-tiers">
+      <view wx:for="{{rewardTiers}}" wx:key="tier" class="rw-tier" hover-class="rw-tier--press" hover-start-time="20" data-tier="{{item.tier}}" bindtap="pickReward">
+        <text class="rw-tier__price">¥{{item.price}}</text>
+        <text class="rw-tier__label">{{item.label}}</text>
+      </view>
+    </view>
+    <view wx:if="{{rewardBusy}}" style="text-align:center;font-size:12px;color:var(--muted);margin-top:14px">正在拉起支付…</view>
+    <view wx:if="{{rewardErr}}" style="text-align:center;font-size:12px;color:var(--danger);margin-top:14px">{{rewardErr}}</view>
+    <button class="btn btn--ghost btn--fw" style="margin-top:16px" bindtap="closeOverlay">{{rewardBusy?'关闭':'先不了'}}</button>
   </view>
 </view>
 

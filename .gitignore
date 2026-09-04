@@ -15,3 +15,6 @@ miniprogram_npm/
 private.*.key
 keys/
 *.pem
+
+# payService 打赏云函数私有配置（AppSecret/OfferID/AppKey，泄露=资金风险，绝不入库）
+cloudfunctions/payService/config.private.js
