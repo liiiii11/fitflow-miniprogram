@@ -1962,7 +1962,9 @@ Page({
                 reset();
                 const msg = (f && f.errMsg) || '';
                 if (f && (f.errCode === -1 || /cancel/i.test(msg))) return; // 用户主动取消：静默不报错
-                this.setData({ rewardErr: '支付未完成，请稍后重试' + (f && f.errCode ? '（' + f.errCode + '）' : '') });
+                // 透出 errMsg 细节（如 IOS_ORDER_PRICE_TOO_LOW / OFFER_ID_INVALID），否则 -15001 等错误无从排查
+                const detail = msg.replace(/^requestVirtualPayment\s*:\s*fail\s*/i, '').trim();
+                this.setData({ rewardErr: '支付未完成（' + f.errCode + '）' + (detail ? '：' + detail : '') });
               }
             });
           },
