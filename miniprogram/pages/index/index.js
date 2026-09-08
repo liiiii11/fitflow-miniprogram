@@ -2011,8 +2011,8 @@ Page({
       self.setData({ aiBusy: false });
       if (!plan || !plan.days || !plan.days.length) { self.setData({ aiErr: why || '生成失败，请重试' }); return; }
       self._loadPlanToEditor(plan, source);
-      // 降级原因停留 4s，否则一闪而过看不清（排查「AI 调用失败」靠这行）
-      if (why) self.toast(why, 4000);
+      // 降级原因停留 4s，并写入 aiErr —— 返回表单页时仍能看到（排查「AI 调用失败」靠它）
+      if (why) { self.setData({ aiErr: why }); self.toast(why, 4000); }
     };
     // 15s 未返回视为超时，直接本地生成（云函数侧请求超时 12s）
     const timer = setTimeout(() => {
@@ -2039,9 +2039,13 @@ Page({
       const m = (err && (err.errMsg || err.message)) || '';
       console.error('[aiProxy] callFunction 失败', err);
       // 云函数未部署/环境异常时 errCode 通常为 -501000，提示明确去向
+      const detail = m ? (m.length > 44 ? m.slice(0, 44) + '…' : m) : '';
       const hint = code === -501000 || /FunctionName|not found|不存在/.test(m)
         ? '云函数未部署（errCode -501000）'
-        : ('调用失败' + (code ? '(' + code + ')' : ''));
+        // -1 多为云函数超时被杀/执行异常：带出 errMsg 片段便于定位
+        : (code === -1
+          ? '云函数执行失败(-1)' + (detail ? '：' + detail : '，多为超时被杀')
+          : ('调用失败' + (code ? '(' + code + ')' : '') + (detail ? '：' + detail : '')));
       land(self.buildLocalPlan(p), 'local', hint + '，已本地生成');
     });
   },
