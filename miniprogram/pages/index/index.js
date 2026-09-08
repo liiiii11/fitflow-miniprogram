@@ -2014,11 +2014,11 @@ Page({
       // 降级原因停留 4s，并写入 aiErr —— 返回表单页时仍能看到（排查「AI 调用失败」靠它）
       if (why) { self.setData({ aiErr: why }); self.toast(why, 4000); }
     };
-    // 15s 未返回视为超时，直接本地生成（云函数侧请求超时 12s）
+    // 28s 未返回视为超时（云函数侧请求上限 25s，AI 生成大段 JSON 常需 10~20s）
     const timer = setTimeout(() => {
       if (settled) return;
-      land(self.buildLocalPlan(p), 'local', 'AI 响应超时（15s），已用本地规则生成');
-    }, 15000);
+      land(self.buildLocalPlan(p), 'local', 'AI 响应超时（28s），已用本地规则生成');
+    }, 28000);
     ai.genPlan(p).then(r => {
       if (settled) return;
       if (r && r.ok && r.days && r.days.length) {

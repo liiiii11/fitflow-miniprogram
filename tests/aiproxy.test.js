@@ -150,6 +150,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(g.days[0].exercises[0].meta === '4×8-12', 'meta 组次保留');
   ok(g.name === '增肌计划', '计划名解析正确');
 
+  // 场景7b：AI 只给动作名（不输出组次）→ 系统按目标自动补 meta
+  console.log('场景7b 组次按目标自动补齐');
+  const mkPlan = goal => ({
+    status: 200,
+    body: { choices: [{ message: { content: '{"name":"计划","days":[{"name":"推日","exercises":[{"name":"杠铃卧推"},{"name":"上斜卧推"}]}]}' } }] }
+  });
+  router = () => mkPlan();
+  let g3 = await load().main({ action: 'generatePlan', profile: { days: 3, dur: 60, goal: '增肌' } });
+  ok(g3.ok === true && g3.days[0].exercises[0].meta === '4×8-12', '增肌自动补 4×8-12（' + g3.days[0].exercises[0].meta + '）');
+  g3 = await load().main({ action: 'generatePlan', profile: { days: 3, dur: 60, goal: '增力' } });
+  ok(g3.days[0].exercises[0].meta === '5×5', '增力自动补 5×5（' + g3.days[0].exercises[0].meta + '）');
+  g3 = await load().main({ action: 'generatePlan', profile: { days: 3, dur: 60, goal: '减脂' } });
+  ok(g3.days[0].exercises[0].meta === '4×12-15', '减脂自动补 4×12-15（' + g3.days[0].exercises[0].meta + '）');
+  g3 = await load().main({ action: 'generatePlan', profile: { days: 3, dur: 60, goal: '塑形' } });
+  ok(g3.days[0].exercises[0].meta === '4×12-15', '塑形自动补 4×12-15');
+  ok(g3.days[0].exercises[1].meta === '4×12-15', '同一计划内所有动作都补上');
+
   // 场景8：AI 返回垃圾文本 → 明确失败供前端降级
   console.log('场景8 AI 返回不可解析');
   router = () => ({ status: 200, body: { choices: [{ message: { content: '抱歉，我无法完成该请求' } }] } });

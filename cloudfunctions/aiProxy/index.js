@@ -229,18 +229,21 @@ exports.main = async (event) => {
 2. 每个训练日 ${exMin}~${exMax} 个动作，数量与 ${dur} 分钟匹配
 3. 动作名用中文标准名（如"杠铃卧推""引体向上""高脚杯深蹲"），不含英文、品牌、组次
 4. 动作必须能在"${p.place}"条件下完成，不要安排用户没有的器械
-5. meta 只写建议组次：增肌 "4×8-12"，增力 "5×5"，减脂/塑形 "4×12-15"
+5. 不要写组次/重量（系统按目标统一给出），每个动作只给名称
 6. 有伤病限制时避开相关部位动作
 7. 计划名不超过 12 字，desc 一句话不超过 30 字
 
 只输出 JSON（可用 \`\`\`json 包裹），不要任何解释文字：
-{"name":"计划名","desc":"一句话简介","days":[{"name":"推日","exercises":[{"name":"杠铃卧推","meta":"4×8-12"}]}]}`
-      }], { temperature: 0.4, max_tokens: 1600, timeout: 12000 });
+{"name":"计划名","desc":"一句话简介","days":[{"name":"推日","exercises":[{"name":"杠铃卧推"}]}]}`
+      }], { temperature: 0.4, max_tokens: 1000, timeout: 25000 });
       if (!r.ok) return r;
       const raw = r.text || '';
       const obj = parseJSON(raw);
       if (!obj || !Array.isArray(obj.days) || !obj.days.length) return { ok: false, msg: 'AI 返回无法解析', raw: raw.slice(0, 200) };
       const cleanStr = (s, max) => String(s == null ? '' : s).replace(/[\r\n]/g, ' ').trim().slice(0, max);
+      // 组次统一由系统按目标给出（AI 不再输出，省 token 且各档一致）；AI 若仍给了则沿用
+      const goal = p.goal || '增肌';
+      const defMeta = /增力/.test(goal) ? '5×5' : ((/减脂|塑形/.test(goal)) ? '4×12-15' : '4×8-12');
       const days = [];
       obj.days.slice(0, 7).forEach(d => {
         if (!d || !Array.isArray(d.exercises)) return;
@@ -252,7 +255,7 @@ exports.main = async (event) => {
           if (!nm || used[nm]) return;
           used[nm] = 1;
           let meta = cleanStr(x.meta, 12);
-          if (!/组|×|x/i.test(meta)) meta = '';
+          if (!/组|×|x/i.test(meta)) meta = defMeta;
           exs.push({ name: nm, meta: meta });
         });
         if (exs.length) days.push({ name: cleanStr(d.name, 10) || '训练日', exercises: exs });

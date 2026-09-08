@@ -348,7 +348,7 @@
   <input class="fg__inp" placeholder="如：右膝不适，避免深蹲" value="{{aiProfile.injury}}" data-k="injury" bindinput="onAIInput" style="width:100%"/>
 
   <view wx:if="{{aiErr}}" style="font-size:12px;color:var(--danger);margin-top:14px">{{aiErr}}</view>
-  <button class="btn btn--pri btn--fw" style="margin-top:20px" bindtap="genAIPlan">{{aiBusy?'生成中…':'生成计划'}}</button>
+  <button class="btn btn--pri btn--fw" style="margin-top:20px" bindtap="genAIPlan">{{aiBusy?'生成中（约 10-25 秒）…':'生成计划'}}</button>
   <button class="btn btn--ghost btn--fw" style="margin-top:10px" bindtap="cancelAIPlan">取消</button>
 </view>
 
