@@ -7,10 +7,13 @@ const https = require('https');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
-const MODEL = 'glm-4-flash';
+// 免费档主力型号优先；老型号作回退（glm-4.5-flash 已下线，任一候选可用即通）
+const MODEL_CANDIDATES = ['glm-4.7-flash', 'glm-4-flash', 'glm-4-flash-250414'];
+const DEFAULT_MODEL = process.env.ZHIPU_MODEL || MODEL_CANDIDATES[0];
 
 // 通用 JSON POST（云函数环境用内置 https，无需额外依赖）
-function postJSON(url, data, headers) {
+function postJSON(url, data, headers, timeout) {
+  const ms = timeout || 9000;
   return new Promise((resolve, reject) => {
     const bodyStr = JSON.stringify(data);
     const u = new URL(url);
@@ -18,13 +21,13 @@ function postJSON(url, data, headers) {
       hostname: u.hostname,
       path: u.pathname + u.search,
       method: 'POST',
-      timeout: 9000,
+      timeout: ms,
       headers: Object.assign({
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(bodyStr)
       }, headers)
     }, res => {
-      res.setTimeout(9000);
+      res.setTimeout(ms);
       let buf = '';
       res.on('data', c => { buf += c; });
       res.on('end', () => {
@@ -39,31 +42,55 @@ function postJSON(url, data, headers) {
   });
 }
 
-// 调用智谱
-async function chatZhipu(messages, opts = {}) {
-  const key = process.env.ZHIPU_API_KEY;
-  if (!key) return { ok: false, msg: '未配置 ZHIPU_API_KEY（请在云函数环境变量中设置）' };
+// 单次调用（指定模型）。fatal=true 表示换模型也没用（key/限流/网络），modelErr=true 表示换型号可重试
+async function callOnce(model, messages, opts, key) {
   try {
     const r = await postJSON(ENDPOINT, {
-      model: MODEL,
-      messages,
+      model: model,
+      messages: messages,
       temperature: opts.temperature != null ? opts.temperature : 0.6,
       max_tokens: opts.max_tokens || 300
-    }, { 'Authorization': 'Bearer ' + key });
+    }, { 'Authorization': 'Bearer ' + key }, opts.timeout || 9000);
 
-    if (r.status === 200 && r.body && r.body.choices) {
-      return { ok: true, text: r.body.choices[0].message.content.trim() };
+    if (r.status === 200 && r.body && r.body.choices && r.body.choices[0]) {
+      return { ok: true, model: model, text: String(r.body.choices[0].message.content || '').trim() };
     }
     if (r.status === 401 || r.status === 403) {
-      return { ok: false, msg: 'Key 无权限/未实名，去 bigmodel.cn 处理' };
+      return { ok: false, fatal: true, msg: 'Key 无权限/未实名（HTTP ' + r.status + '），去 bigmodel.cn 处理' };
     }
     if (r.status === 429) {
-      return { ok: false, msg: '请求过于频繁，稍后再试' };
+      return { ok: false, fatal: true, msg: '请求过于频繁（限流），稍后再试' };
     }
-    return { ok: false, msg: '智谱返回 ' + r.status + (r.body && r.body.error ? ' ' + JSON.stringify(r.body.error) : '') };
+    const errStr = r.body && r.body.error ? JSON.stringify(r.body.error) : '';
+    return {
+      ok: false,
+      status: r.status,
+      modelErr: r.status === 404 || /model|模型/i.test(errStr),
+      msg: '智谱返回 ' + r.status + (errStr ? ' ' + errStr : '')
+    };
   } catch (e) {
-    return { ok: false, msg: '请求失败: ' + e.message };
+    return { ok: false, fatal: true, msg: '请求失败: ' + (e && e.message ? e.message : String(e)) };
   }
+}
+
+// 调用智谱：按候选型号依次尝试，第一个可用即返回（型号下线/改名自动兼容）
+async function chatZhipu(messages, opts = {}) {
+  const key = process.env.ZHIPU_API_KEY;
+  if (!key) return { ok: false, fatal: true, msg: '未配置 ZHIPU_API_KEY（请在云函数环境变量中设置）' };
+  const list = [].concat(opts.model ? [opts.model] : [DEFAULT_MODEL]).concat(MODEL_CANDIDATES);
+  const tried = [];
+  let last = { ok: false, msg: '未知错误' };
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i];
+    if (!m || tried.indexOf(m) >= 0) continue;
+    tried.push(m);
+    const r = await callOnce(m, messages, opts, key);
+    if (r.ok) { r.tried = tried; return r; }
+    last = r;
+    if (r.fatal || !r.modelErr) break; // key/限流/网络问题不再试其他型号
+  }
+  last.tried = tried;
+  return last;
 }
 
 // 从 AI 文本中解析 JSON（兼容 ```json 包裹、前后废话、花括号区间）
@@ -87,6 +114,31 @@ exports.main = async (event) => {
 
     if (action === 'test') {
       return await chatZhipu([{ role: 'user', content: '只回复两个字：正常' }], { temperature: 0.1, max_tokens: 10 });
+    }
+
+    // 自检：返回 key 状态 + 逐个候选模型的实测结果，用于定位「AI 调用失败」的真实原因
+    if (action === 'diag') {
+      const key = process.env.ZHIPU_API_KEY || '';
+      const out = {
+        ok: true,
+        keyConfigured: !!key,
+        keyMasked: key ? key.slice(0, 6) + '***' + key.slice(-4) : '',
+        keyFormatOK: /^[\w.-]{20,}$/.test(key),
+        defaultModel: DEFAULT_MODEL,
+        candidates: MODEL_CANDIDATES,
+        nodeVersion: process.version,
+        tests: []
+      };
+      for (let i = 0; i < MODEL_CANDIDATES.length; i++) {
+        const m = MODEL_CANDIDATES[i];
+        const t0 = Date.now();
+        const r = key
+          ? await callOnce(m, [{ role: 'user', content: '只回复两个字：正常' }], { temperature: 0.1, max_tokens: 10, timeout: 12000 }, key)
+          : { ok: false, msg: '未配置 key，跳过实测' };
+        out.tests.push({ model: m, ok: !!r.ok, ms: Date.now() - t0, msg: r.ok ? (r.text || '') : r.msg });
+      }
+      out.workingModel = (out.tests.filter(t => t.ok)[0] || {}).model || '';
+      return out;
     }
 
     // 食物每100g热量估算（对应原版 queryFoodCalAI）
@@ -179,7 +231,7 @@ exports.main = async (event) => {
 
 只输出 JSON（可用 \`\`\`json 包裹），不要任何解释文字：
 {"name":"计划名","desc":"一句话简介","days":[{"name":"推日","exercises":[{"name":"杠铃卧推","meta":"4×8-12"}]}]}`
-      }], { temperature: 0.4, max_tokens: 2000 });
+      }], { temperature: 0.4, max_tokens: 1600, timeout: 12000 });
       if (!r.ok) return r;
       const raw = r.text || '';
       const obj = parseJSON(raw);

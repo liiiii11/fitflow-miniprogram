@@ -283,10 +283,10 @@ Page({
   },
 
   // ==================== TOAST ====================
-  toast(msg) {
+  toast(msg, dur) {
     this.setData({ toast: msg, toastShow: true });
     clearTimeout(this._toastT);
-    this._toastT = setTimeout(() => this.setData({ toastShow: false }), 1500);
+    this._toastT = setTimeout(() => this.setData({ toastShow: false }), dur || 1500);
   },
 
   // ==================== DAILY RESET & HISTORY ====================
@@ -2011,13 +2011,14 @@ Page({
       self.setData({ aiBusy: false });
       if (!plan || !plan.days || !plan.days.length) { self.setData({ aiErr: why || '生成失败，请重试' }); return; }
       self._loadPlanToEditor(plan, source);
-      if (why) self.toast(why);
+      // 降级原因停留 4s，否则一闪而过看不清（排查「AI 调用失败」靠这行）
+      if (why) self.toast(why, 4000);
     };
-    // 12s 未返回视为超时，直接本地生成（真机弱网常见）
+    // 15s 未返回视为超时，直接本地生成（云函数侧请求超时 12s）
     const timer = setTimeout(() => {
       if (settled) return;
-      land(self.buildLocalPlan(p), 'local', 'AI 响应超时，已用本地规则生成');
-    }, 12000);
+      land(self.buildLocalPlan(p), 'local', 'AI 响应超时（15s），已用本地规则生成');
+    }, 15000);
     ai.genPlan(p).then(r => {
       if (settled) return;
       if (r && r.ok && r.days && r.days.length) {
@@ -2032,9 +2033,16 @@ Page({
       } else {
         land(self.buildLocalPlan(p), 'local', 'AI 不可用（' + ((r && r.msg) || '未知') + '），已本地生成');
       }
-    }).catch(() => {
+    }).catch(err => {
       if (settled) return;
-      land(self.buildLocalPlan(p), 'local', 'AI 调用失败，已本地生成');
+      const code = err && err.errCode;
+      const m = (err && (err.errMsg || err.message)) || '';
+      console.error('[aiProxy] callFunction 失败', err);
+      // 云函数未部署/环境异常时 errCode 通常为 -501000，提示明确去向
+      const hint = code === -501000 || /FunctionName|not found|不存在/.test(m)
+        ? '云函数未部署（errCode -501000）'
+        : ('调用失败' + (code ? '(' + code + ')' : ''));
+      land(self.buildLocalPlan(p), 'local', hint + '，已本地生成');
     });
   },
   // 生成结果落地到计划编辑器（用户可改后保存），meta 留建议组次但 metaDate 为空 → 不污染主页「今日已填」
