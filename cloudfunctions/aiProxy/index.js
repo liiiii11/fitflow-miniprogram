@@ -59,7 +59,8 @@ async function callOnce(model, messages, opts, key) {
       return { ok: false, fatal: true, msg: 'Key 无权限/未实名（HTTP ' + r.status + '），去 bigmodel.cn 处理' };
     }
     if (r.status === 429) {
-      return { ok: false, fatal: true, msg: '请求过于频繁（限流），稍后再试' };
+      // 限流是模型级的（实测 glm-4.7-flash 429 时 glm-4-flash 正常），换下一个型号而不是放弃
+      return { ok: false, modelErr: true, msg: '请求过于频繁（限流 429），换模型重试' };
     }
     const errStr = r.body && r.body.error ? JSON.stringify(r.body.error) : '';
     return {
@@ -73,11 +74,14 @@ async function callOnce(model, messages, opts, key) {
   }
 }
 
-// 调用智谱：按候选型号依次尝试，第一个可用即返回（型号下线/改名自动兼容）
+// 上次成功的型号（云函数热实例间保留），下次直接优先用它，省掉逐个试错的前置耗时
+let LAST_GOOD_MODEL = null;
+
+// 调用智谱：按候选型号依次尝试，第一个可用即返回（型号下线/限流自动兼容）
 async function chatZhipu(messages, opts = {}) {
   const key = process.env.ZHIPU_API_KEY;
   if (!key) return { ok: false, fatal: true, msg: '未配置 ZHIPU_API_KEY（请在云函数环境变量中设置）' };
-  const list = [].concat(opts.model ? [opts.model] : [DEFAULT_MODEL]).concat(MODEL_CANDIDATES);
+  const list = [].concat(opts.model ? [opts.model] : []).concat(LAST_GOOD_MODEL ? [LAST_GOOD_MODEL] : []).concat([DEFAULT_MODEL]).concat(MODEL_CANDIDATES);
   const tried = [];
   let last = { ok: false, msg: '未知错误' };
   for (let i = 0; i < list.length; i++) {
@@ -85,9 +89,9 @@ async function chatZhipu(messages, opts = {}) {
     if (!m || tried.indexOf(m) >= 0) continue;
     tried.push(m);
     const r = await callOnce(m, messages, opts, key);
-    if (r.ok) { r.tried = tried; return r; }
+    if (r.ok) { LAST_GOOD_MODEL = m; r.tried = tried; return r; }
     last = r;
-    if (r.fatal || !r.modelErr) break; // key/限流/网络问题不再试其他型号
+    if (r.fatal || !r.modelErr) break; // key/网络问题不再试其他型号
   }
   last.tried = tried;
   return last;

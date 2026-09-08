@@ -73,6 +73,36 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(calls.length === 2 && calls[1] === 'glm-4-flash', '依次尝试 2 个型号后成功（' + calls.join(' → ') + '）');
   ok(r.model === 'glm-4-flash', '返回实际生效型号');
 
+  // 场景2b：429 限流是模型级 → 换型号回退而不是放弃（diag 实测 glm-4.7-flash 429 时 glm-4-flash 正常）
+  console.log('场景2b 429 限流自动回退');
+  calls = [];
+  router = m => (m === 'glm-4.7-flash'
+    ? { status: 429, body: { error: { message: 'rate limit' } } }
+    : { status: 200, body: { choices: [{ message: { content: '正常' } }] } });
+  r = await load().main({ action: 'test' });
+  ok(r.ok === true, '429 限流后回退成功');
+  ok(calls.length === 2 && calls[0] === 'glm-4.7-flash' && calls[1] === 'glm-4-flash', '限流型号跳过后成功（' + calls.join(' → ') + '）');
+  ok(r.model === 'glm-4-flash', '限流回退后 model = glm-4-flash');
+
+  // 场景2c：LAST_GOOD_MODEL 记忆——同一热实例内，上次成功的型号下次优先（省试错耗时）
+  console.log('场景2c 记住可用型号优先');
+  const hot = load();
+  calls = [];
+  router = () => ({ status: 200, body: { choices: [{ message: { content: '正常' } }] } });
+  await hot.main({ action: 'test' });
+  ok(calls[0] === 'glm-4.7-flash', '首次按默认优先级（' + calls.join(',') + '）');
+  calls = [];
+  router = m => (m === 'glm-4.7-flash'
+    ? { status: 429, body: { error: { message: 'rate limit' } } }
+    : { status: 200, body: { choices: [{ message: { content: '正常' } }] } });
+  await hot.main({ action: 'test' });
+  ok(calls[1] === 'glm-4-flash', '限流回退到 glm-4-flash（' + calls.join(',') + '）');
+  calls = [];
+  router = () => ({ status: 200, body: { choices: [{ message: { content: '正常' } }] } });
+  r = await hot.main({ action: 'test' });
+  ok(calls[0] === 'glm-4-flash', '第三次直接优先上次成功的 glm-4-flash（' + calls.join(',') + '）');
+  ok(r.ok === true, '记忆型号命中成功');
+
   // 场景3：key 无效 401 → fatal，不再重试其他型号（避免拖慢）
   console.log('场景3 key 无效不重试');
   calls = [];
