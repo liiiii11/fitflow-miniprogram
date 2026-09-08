@@ -8,82 +8,6 @@ const DEFAULT_WATER_GOAL = 2000;
 const CUP_ML = 250;
 const WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MONTH_CN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-// AI 计划本地兜底：按「场地 → 部位」内置动作池（AI 不可用/超时时按规则拼装，保证永远有结果）
-const AI_POOL = {
-  '健身房': {
-    chest: ['杠铃卧推', '上斜哑铃卧推', '器械夹胸', '双杠臂屈伸'],
-    back: ['引体向上', '高位下拉', '杠铃划船', '坐姿划船', '面拉'],
-    legs: ['杠铃深蹲', '罗马尼亚硬拉', '腿举', '腿屈伸', '腿弯举', '站姿提踵'],
-    shoulder: ['站姿杠铃推举', '哑铃侧平举', '哑铃前平举', '俯身飞鸟'],
-    arms: ['杠铃弯举', '绳索下压', '锤式弯举', '窄距卧推'],
-    core: ['平板支撑', '卷腹', '悬垂举腿'],
-    cardio: ['跑步机慢跑', '划船机', '椭圆机']
-  },
-  '居家哑铃': {
-    chest: ['哑铃卧推', '哑铃飞鸟', '上斜哑铃推举'],
-    back: ['哑铃划船', '单臂哑铃划船', '哑铃硬拉'],
-    legs: ['高脚杯深蹲', '哑铃箭步蹲', '哑铃罗马尼亚硬拉', '哑铃提踵'],
-    shoulder: ['哑铃推举', '哑铃侧平举', '哑铃前平举'],
-    arms: ['哑铃弯举', '哑铃臂屈伸', '锤式弯举'],
-    core: ['平板支撑', '卷腹', '俄罗斯转体'],
-    cardio: ['开合跳', '高抬腿']
-  },
-  '纯自重': {
-    chest: ['标准俯卧撑', '上斜俯卧撑', '钻石俯卧撑'],
-    back: ['反向划船', '引体向上', '超人式'],
-    legs: ['自重深蹲', '箭步蹲', '保加利亚分腿蹲', '单腿提踵'],
-    shoulder: ['派克俯卧撑', '靠墙倒立撑', '凳上臂屈伸'],
-    arms: ['窄距俯卧撑', '仰卧撑', '反向弯举'],
-    core: ['平板支撑', '卷腹', '登山跑', '俄罗斯转体'],
-    cardio: ['波比跳', '开合跳', '高抬腿', '登山跑']
-  },
-  '弹力带': {
-    chest: ['弹力带推胸', '弹力带夹胸', '弹力带俯卧撑'],
-    back: ['弹力带划船', '弹力带下拉', '弹力带面拉'],
-    legs: ['弹力带深蹲', '弹力带侧步走', '弹力带臀桥', '弹力带提踵'],
-    shoulder: ['弹力带推举', '弹力带侧平举', '弹力带前平举'],
-    arms: ['弹力带弯举', '弹力带臂屈伸', '弹力带锤式弯举'],
-    core: ['平板支撑', '卷腹', '俄罗斯转体'],
-    cardio: ['开合跳', '高抬腿']
-  }
-};
-// 每周天数 → 每天的部位序列（重复表示多动作来自同部位；按天序号轮转取动作，避免不同天重复）
-const AI_SPLIT = {
-  2: [['chest', 'back', 'legs', 'legs', 'shoulder', 'arms', 'core'], ['chest', 'back', 'legs', 'legs', 'shoulder', 'arms', 'core']],
-  3: [
-    ['chest', 'chest', 'shoulder', 'shoulder', 'arms', 'arms', 'core'],
-    ['back', 'back', 'back', 'shoulder', 'arms', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'legs', 'core', 'core', 'shoulder']
-  ],
-  4: [
-    ['chest', 'back', 'shoulder', 'arms', 'chest', 'core'],
-    ['legs', 'legs', 'legs', 'legs', 'core', 'core'],
-    ['chest', 'back', 'back', 'shoulder', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'core', 'core', 'shoulder']
-  ],
-  5: [
-    ['chest', 'chest', 'shoulder', 'shoulder', 'arms', 'arms'],
-    ['back', 'back', 'back', 'back', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'legs', 'core', 'core'],
-    ['chest', 'back', 'shoulder', 'arms', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'shoulder', 'core', 'core']
-  ],
-  6: [
-    ['chest', 'chest', 'shoulder', 'shoulder', 'arms', 'arms'],
-    ['back', 'back', 'back', 'back', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'legs', 'core', 'core'],
-    ['chest', 'back', 'shoulder', 'arms', 'arms', 'core'],
-    ['legs', 'legs', 'legs', 'core', 'core', 'shoulder'],
-    ['core', 'core', 'cardio', 'cardio', 'legs', 'shoulder']
-  ]
-};
-const AI_DAY_NAMES = {
-  2: ['全身A', '全身B'],
-  3: ['推日', '拉日', '腿日'],
-  4: ['上肢A', '下肢A', '上肢B', '下肢B'],
-  5: ['推日', '拉日', '腿日', '上肢日', '下肢日'],
-  6: ['推日', '拉日', '腿日', '上肢日', '下肢日', '核心有氧日']
-};
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const MEAL_LABELS = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
 const CAT_ORDER = ['肉蛋', '水产', '主食', '蔬菜', '豆奶', '水果', '坚果零食', '饮品', '快餐小吃'];
@@ -212,17 +136,6 @@ Page({
     planDetailApplyText: '使用此计划', planDetailApplyDisabled: false,
     planEditorTitle: '新建计划', planName: '', newDayName: '', planDaysView: [],
     dayEditorTitle: '', dayExName: '', dayExList: [],
-    // AI 生成计划表单
-    aiBusy: false, aiErr: '',
-    aiProfile: { gender: '男', age: '', height: '', weight: '', years: '新手', place: '健身房', days: 4, dur: 60, goal: '增肌', injury: '' },
-    aiChipOpts: {
-      gender: ['男', '女'],
-      years: ['新手', '进阶', '老手'],
-      place: ['健身房', '居家哑铃', '纯自重', '弹力带'],
-      days: [2, 3, 4, 5, 6],
-      dur: [30, 45, 60, 90],
-      goal: ['增肌', '减脂', '增力', '塑形']
-    },
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [],
     growthText: '', growthBars: [], growthHasRefresh: false, growthLoading: false,
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
@@ -311,9 +224,11 @@ Page({
       // 补剂：清单保留，勾选状态每天重置
       (this.state.supps || []).forEach(s => { s.done = false; });
       if (plan && plan.days && plan.days.length > 0) {
-        // 从最后一个实际练过的训练日顺延（当天中途切走只看不练时，不跳过未练的训练日）
-        const base = lastTrainedIdx >= 0 ? lastTrainedIdx : this.state.currentDayIdx;
-        this.state.currentDayIdx = (base + 1) % plan.days.length;
+        if (lastTrainedIdx >= 0) {
+          // 当天至少练过一天：从最后一个实际练过的训练日顺延
+          this.state.currentDayIdx = (lastTrainedIdx + 1) % plan.days.length;
+        }
+        // 当天中途切走只看不练（lastTrainedIdx === -1）：currentDayIdx 保持不变，不跳过未练的训练日
       }
       this.state.lastActiveDate = today;
       this.saveState();
@@ -1928,143 +1843,6 @@ Page({
     this._aiPlanDesc = '';
   },
 
-  // ==================== AI 生成计划 ====================
-  // 入口在计划列表页标题栏「AI 生成」：填身体/场地/目标 → 云函数 aiProxy(generatePlan) → 落地计划编辑器可编辑后保存。
-  // AI 不可用（云函数未部署 / key 未配 / 超时 / 返回异常）一律降级 buildLocalPlan，保证功能永远产出可执行计划。
-  openAIPlan() {
-    this.pushPage('planAI', { aiErr: '' });
-  },
-  cancelAIPlan() { this.popPage('plans'); },
-  pickAIChip(e) {
-    const k = e.currentTarget.dataset.k;
-    const v = e.currentTarget.dataset.v;
-    const prof = Object.assign({}, this.data.aiProfile);
-    prof[k] = (k === 'days' || k === 'dur') ? Number(v) : v;
-    this.setData({ aiProfile: prof });
-  },
-  onAIInput(e) {
-    const k = e.currentTarget.dataset.k;
-    const prof = Object.assign({}, this.data.aiProfile);
-    prof[k] = e.detail.value;
-    this.setData({ aiProfile: prof });
-  },
-  // 本地规则兜底：目标/天数/场地/时长 → 结构化计划（与 AI 返回同构）
-  buildLocalPlan(p) {
-    const goal = p.goal || '增肌';
-    const place = p.place || '健身房';
-    const pool = AI_POOL[place] || AI_POOL['健身房'];
-    const daysN = Math.min(6, Math.max(2, Number(p.days) || 3));
-    const dur = Number(p.dur) || 60;
-    const exN = dur <= 30 ? 4 : (dur <= 45 ? 5 : (dur <= 60 ? 6 : 7));
-    const meta = goal === '增力' ? '5×5' : ((goal === '减脂' || goal === '塑形') ? '4×12-15' : '4×8-12');
-    const loop = (goal === '减脂' || goal === '塑形'); // 减脂/塑形走全身循环 + 有氧收尾
-    const names = loop ? ['循环日A', '循环日B', '循环日C', '循环日D', '循环日E', '循环日F'] : (AI_DAY_NAMES[daysN] || AI_DAY_NAMES[3]);
-    const loopParts = ['legs', 'chest', 'back', 'shoulder', 'arms', 'core', 'cardio', 'cardio'];
-    const splits = AI_SPLIT[daysN] || AI_SPLIT[3];
-    const days = [];
-    for (let i = 0; i < daysN; i++) {
-      const parts = loop ? loopParts : splits[i % splits.length];
-      const used = {};
-      const exs = [];
-      for (let j = 0; j < parts.length && exs.length < exN; j++) {
-        const part = parts[j];
-        const list = pool[part] || [];
-        if (!list.length) continue;
-        const k = used[part] || 0;
-        const name = list[(i + k) % list.length];
-        used[part] = k + 1;
-        if (!name || exs.some(x => x.name === name)) continue;
-        exs.push({ name: name, meta: meta, done: false, metaDate: '' });
-      }
-      // 减脂/塑形保证有氧收尾
-      if (loop && exs.length) {
-        const cardioPool = pool.cardio || [];
-        const hasCardio = exs.some(x => cardioPool.indexOf(x.name) >= 0);
-        if (!hasCardio && cardioPool.length) {
-          if (exs.length >= exN) exs.pop();
-          exs.push({ name: cardioPool[i % cardioPool.length], meta: meta, done: false, metaDate: '' });
-        }
-      }
-      days.push({ name: names[i] || ('训练日' + (i + 1)), exercises: exs });
-    }
-    const label = { '增肌': '增肌计划', '减脂': '减脂循环', '增力': '增力计划', '塑形': '塑形计划' }[goal] || '训练计划';
-    return {
-      name: label + ' · 每周' + daysN + '练',
-      desc: '本地生成 · ' + goal + ' · ' + place + ' · ' + dur + '分钟',
-      days: days
-    };
-  },
-  genAIPlan() {
-    if (this.data.aiBusy) return;
-    const p = this.data.aiProfile;
-    const age = Number(p.age), h = Number(p.height), w = Number(p.weight);
-    if (!(age >= 10 && age <= 90)) { this.toast('请填写年龄（10-90）'); return; }
-    if (!(h >= 120 && h <= 220)) { this.toast('请填写身高（120-220cm）'); return; }
-    if (!(w >= 30 && w <= 200)) { this.toast('请填写体重（30-200kg）'); return; }
-    this.setData({ aiBusy: true, aiErr: '' });
-    const self = this;
-    let settled = false;
-    const land = (plan, source, why) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      self.setData({ aiBusy: false });
-      if (!plan || !plan.days || !plan.days.length) { self.setData({ aiErr: why || '生成失败，请重试' }); return; }
-      self._loadPlanToEditor(plan, source);
-      // 降级原因停留 4s，并写入 aiErr —— 返回表单页时仍能看到（排查「AI 调用失败」靠它）
-      if (why) { self.setData({ aiErr: why }); self.toast(why, 4000); }
-    };
-    // 28s 未返回视为超时（云函数侧请求上限 25s，AI 生成大段 JSON 常需 10~20s）
-    const timer = setTimeout(() => {
-      if (settled) return;
-      land(self.buildLocalPlan(p), 'local', 'AI 响应超时（28s），已用本地规则生成');
-    }, 28000);
-    ai.genPlan(p).then(r => {
-      if (settled) return;
-      if (r && r.ok && r.days && r.days.length) {
-        land({
-          name: r.name,
-          desc: r.desc || ('AI 生成 · ' + (p.goal || '') + ' · ' + p.days + '天/周'),
-          days: r.days.map(d => ({
-            name: d.name,
-            exercises: (d.exercises || []).map(x => ({ name: x.name, meta: x.meta || '', done: false, metaDate: '' }))
-          }))
-        }, 'ai', '');
-      } else {
-        land(self.buildLocalPlan(p), 'local', 'AI 不可用（' + ((r && r.msg) || '未知') + '），已本地生成');
-      }
-    }).catch(err => {
-      if (settled) return;
-      const code = err && err.errCode;
-      const m = (err && (err.errMsg || err.message)) || '';
-      console.error('[aiProxy] callFunction 失败', err);
-      // 云函数未部署/环境异常时 errCode 通常为 -501000，提示明确去向
-      const detail = m ? (m.length > 44 ? m.slice(0, 44) + '…' : m) : '';
-      const hint = code === -501000 || /FunctionName|not found|不存在/.test(m)
-        ? '云函数未部署（errCode -501000）'
-        // -1 多为云函数超时被杀/执行异常：带出 errMsg 片段便于定位
-        : (code === -1
-          ? '云函数执行失败(-1)' + (detail ? '：' + detail : '，多为超时被杀')
-          : ('调用失败' + (code ? '(' + code + ')' : '') + (detail ? '：' + detail : '')));
-      land(self.buildLocalPlan(p), 'local', hint + '，已本地生成');
-    });
-  },
-  // 生成结果落地到计划编辑器（用户可改后保存），meta 留建议组次但 metaDate 为空 → 不污染主页「今日已填」
-  _loadPlanToEditor(plan, source) {
-    this._detailPlanId = null;
-    this._editorBackTo = 'plans';
-    this._editorDays = plan.days.map(d => ({
-      name: d.name,
-      exercises: (d.exercises || []).map(x => ({ name: x.name, meta: x.meta || '', done: false, metaDate: '' }))
-    }));
-    this._aiPlanDesc = plan.desc || '';
-    this.pushPage('planEditor', {
-      planEditorTitle: source === 'ai' ? 'AI 生成计划' : '本地生成计划',
-      planName: plan.name,
-      newDayName: ''
-    });
-    this.renderEditorDays();
-  },
 
   showPlanDetailById(id) {
     const plan = this.getAllPlans().find(p => p.id === id);

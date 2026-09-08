@@ -37,10 +37,4 @@ function analyzeGrowth(weekly, details, progress) {
   return callAI('analyzeGrowth', { weekly, details, progress });
 }
 
-// AI 生成训练计划：profile={gender,age,height,weight,years,place,days,dur,goal,injury}
-// 返回 { ok, source:'ai', name, desc, days:[{name,exercises:[{name,meta}]}] }；失败由前端降级本地规则
-function genPlan(profile) {
-  return callAI('generatePlan', { profile });
-}
-
-module.exports = { callAI, testAI, foodCalAI, queryMet, calibrateBurn, analyzeGrowth, genPlan };
+module.exports = { callAI, testAI, foodCalAI, queryMet, calibrateBurn, analyzeGrowth };
