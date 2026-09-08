@@ -522,6 +522,11 @@ Page({
   getAllPlans() {
     return [].concat(this.state.plans || []).concat(this.state.customPlans || []);
   },
+  // 旧版自定义计划保存时自动生成过「X 个训练日 · Y 个动作」desc，与卡片胶囊标签/详情统计重复 → 隐藏
+  cleanPlanDesc(desc) {
+    if (desc && /^\d+\s*个训练日\s*·\s*\d+\s*个动作$/.test(desc)) return '';
+    return desc || '';
+  },
   getCurrentExercises() {
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (!plan || !plan.days || plan.days.length === 0) return [];
@@ -1644,8 +1649,7 @@ Page({
         ? days.map(d => (d.name || '训练日') + ' ' + (d.exercises || []).length + '动作')
         : (p.tags || []);
       // 兼容旧版自定义计划：desc 是保存时自动生成的「X 个训练日 · Y 个动作」，与胶囊标签重复，改为不显示
-      let desc = p.desc || '';
-      if (/^\d+\s*个训练日\s*·\s*\d+\s*个动作$/.test(desc)) desc = '';
+      let desc = this.cleanPlanDesc(p.desc);
       return {
         id: p.id,
         name: p.name,
@@ -1670,7 +1674,7 @@ Page({
     }));
     this.pushPage('planDetail', {
       planDetailName: plan.name,
-      planDetailDesc: plan.desc || '',
+      planDetailDesc: this.cleanPlanDesc(plan.desc),
       planDetailDays: days,
       planDetailIsCustom: isCustom,
       planDetailDeleteShow: isCustom,
@@ -1847,7 +1851,7 @@ Page({
     }));
     this.pushPage('planDetail', {
       planDetailName: plan.name,
-      planDetailDesc: plan.desc || '',
+      planDetailDesc: this.cleanPlanDesc(plan.desc),
       planDetailDays: days,
       planDetailIsCustom: isCustom,
       planDetailDeleteShow: isCustom,
