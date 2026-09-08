@@ -224,7 +224,10 @@
   <view class="back-btn" bindtap="backHome">← 返回</view>
   <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
     <text style="font-size:20px;font-weight:600">训练计划</text>
-    <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="openPlanEditor">+ 新建</text>
+    <view style="display:flex;align-items:center;gap:16px">
+      <text style="font-size:13px;color:var(--accent);font-weight:500" bindtap="openAIPlan">AI 生成</text>
+      <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="openPlanEditor">+ 新建</text>
+    </view>
   </view>
   <view wx:for="{{planList}}" wx:key="id" class="plan-card" bindtap="showPlanDetail" data-id="{{item.id}}">
     <view style="display:flex;align-items:center;justify-content:space-between">
@@ -289,6 +292,64 @@
     <button class="btn btn--ghost" style="flex:1" bindtap="cancelPlanEditor">取消</button>
     <button class="btn btn--pri btn--fw" style="flex:2" bindtap="savePlan">保存计划</button>
   </view>
+</view>
+
+<!-- AI 生成计划 -->
+<view wx:if="{{pageOverlay==='planAI' || pageLeaving==='planAI' || pageUnder==='planAI'}}" class="ov-page {{pageLeaving==='planAI' ? 'ov-page--out' : (pageUnder==='planAI' ? 'ov-page--under' : (pgAnim==='pop' ? 'ov-page--pop' : ''))}}" style="padding-top:{{safeTop}}px">
+  <view class="back-btn" bindtap="cancelAIPlan">← 返回</view>
+  <view style="font-size:20px;font-weight:600;margin-bottom:4px">AI 生成计划</view>
+  <view style="font-size:12px;color:var(--muted);margin-bottom:20px">填写你的情况，AI 生成可直接练的计划；AI 不可用时自动本地生成</view>
+
+  <view class="sec-title">身体信息</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.gender}}" wx:key="*this" class="ai-chip {{aiProfile.gender===item?'on':''}}" data-k="gender" data-v="{{item}}" bindtap="pickAIChip">{{item}}</view>
+  </view>
+  <view class="ai-fields">
+    <view class="ai-field">
+      <text class="ai-field__lbl">年龄</text>
+      <input class="ai-field__inp" type="number" placeholder="25" value="{{aiProfile.age}}" data-k="age" bindinput="onAIInput"/>
+    </view>
+    <view class="ai-field">
+      <text class="ai-field__lbl">身高 cm</text>
+      <input class="ai-field__inp" type="number" placeholder="175" value="{{aiProfile.height}}" data-k="height" bindinput="onAIInput"/>
+    </view>
+    <view class="ai-field">
+      <text class="ai-field__lbl">体重 kg</text>
+      <input class="ai-field__inp" type="number" placeholder="70" value="{{aiProfile.weight}}" data-k="weight" bindinput="onAIInput"/>
+    </view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">训练经验</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.years}}" wx:key="*this" class="ai-chip {{aiProfile.years===item?'on':''}}" data-k="years" data-v="{{item}}" bindtap="pickAIChip">{{item}}</view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">训练场地</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.place}}" wx:key="*this" class="ai-chip {{aiProfile.place===item?'on':''}}" data-k="place" data-v="{{item}}" bindtap="pickAIChip">{{item}}</view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">每周可练</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.days}}" wx:key="*this" class="ai-chip {{aiProfile.days===item?'on':''}}" data-k="days" data-v="{{item}}" bindtap="pickAIChip">{{item}} 天</view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">单次时长</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.dur}}" wx:key="*this" class="ai-chip {{aiProfile.dur===item?'on':''}}" data-k="dur" data-v="{{item}}" bindtap="pickAIChip">{{item}} 分钟</view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">训练目标</view>
+  <view class="ai-chips">
+    <view wx:for="{{aiChipOpts.goal}}" wx:key="*this" class="ai-chip {{aiProfile.goal===item?'on':''}}" data-k="goal" data-v="{{item}}" bindtap="pickAIChip">{{item}}</view>
+  </view>
+
+  <view class="sec-title" style="margin-top:20px">伤病 / 限制（选填）</view>
+  <input class="fg__inp" placeholder="如：右膝不适，避免深蹲" value="{{aiProfile.injury}}" data-k="injury" bindinput="onAIInput" style="width:100%"/>
+
+  <view wx:if="{{aiErr}}" style="font-size:12px;color:var(--danger);margin-top:14px">{{aiErr}}</view>
+  <button class="btn btn--pri btn--fw" style="margin-top:20px" bindtap="genAIPlan">{{aiBusy?'生成中…':'生成计划'}}</button>
+  <button class="btn btn--ghost btn--fw" style="margin-top:10px" bindtap="cancelAIPlan">取消</button>
 </view>
 
 <!-- ==================== 底部弹窗（overlay） ==================== -->
