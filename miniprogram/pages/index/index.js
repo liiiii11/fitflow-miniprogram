@@ -1636,13 +1636,24 @@ Page({
   // ==================== PLANS ====================
   renderPlanList() {
     const plans = this.getAllPlans();
-    const view = plans.map(p => ({
-      id: p.id,
-      name: p.name,
-      desc: p.desc || '',
-      tags: p.tags || [],
-      current: p.id === this.state.currentPlanId
-    }));
+    const view = plans.map(p => {
+      const days = p.days || [];
+      // 统计行：N 个训练日 + 每个训练日的动作数（用 / 分隔，随主页增删动作实时变化）
+      const stat = days.length
+        ? days.length + ' 个训练日 · 动作 ' + days.map(d => (d.exercises || []).length).join('/')
+        : '';
+      // 兼容旧版自定义计划：desc 是保存时自动生成的「X 个训练日 · Y 个动作」，与 stat 重复，改为不显示
+      let desc = p.desc || '';
+      if (/^\d+\s*个训练日\s*·\s*\d+\s*个动作$/.test(desc)) desc = '';
+      return {
+        id: p.id,
+        name: p.name,
+        desc: desc,
+        stat: stat,
+        tags: p.tags || [],
+        current: p.id === this.state.currentPlanId
+      };
+    });
     this.setData({ planList: view });
   },
   showPlanDetail(e) {
