@@ -12,6 +12,18 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const MEAL_LABELS = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
 const CAT_ORDER = ['肉蛋', '水产', '主食', '蔬菜', '豆奶', '水果', '坚果零食', '饮品', '快餐小吃'];
 
+// 动作 → 肌群映射（关键词匹配，顺序敏感：越具体越靠前）。
+// 用途：训练报告「近 7 天部位组数」，判断练得是否偏科（循证区间 10~20 组/周/部位）。
+const MUSCLE_RULES = [
+  { key: 'core', label: '核心', kw: ['卷腹', '仰卧起坐', '平板支撑', '平板', 'plank', 'crunch', '举腿', '腹肌', '腹', '转体', '死虫', '登山跑'] },
+  { key: 'cardio', label: '有氧', kw: ['跑步', '慢跑', '快走', '快走', '骑行', '单车', '游泳', '椭圆机', '椭圆', '跳绳', '爬楼', '划船机', '有氧', 'hiit', '波比跳', '开合跳', '高抬腿'] },
+  { key: 'legs', label: '腿臀', kw: ['深蹲', '腿举', '箭步', '弓步', '保加利亚', '硬拉', '相扑', '臀桥', '髋推', '腿弯举', '腿屈伸', '提踵', '腘绳', '小腿', 'squat', 'lunge', 'deadlift'] },
+  { key: 'chest', label: '胸', kw: ['卧推', '飞鸟', '夹胸', '俯卧撑', '上斜', '下斜', '推胸', '胸推', '双杠', '胸'] },
+  { key: 'back', label: '背', kw: ['引体', '下拉', '划船', '背阔', '背', '反向飞鸟'] },
+  { key: 'shoulder', label: '肩', kw: ['推举', '肩推', '侧平举', '前平举', '面拉', '耸肩', '阿诺德', '肩'] },
+  { key: 'arms', label: '手臂', kw: ['弯举', '臂屈伸', '三头', '二头', '锤式', '下压', '腕弯举', '臂'] }
+];
+
 // 默认计划（与原版一致）
 const DEFAULT_PLANS = [
   { id: 'ppl', name: '推拉腿训练', desc: '每周 6 天 · 增肌 · 推/拉/腿', tags: ['推日 4动作', '拉日 5动作', '腿日 5动作'],
@@ -2255,6 +2267,15 @@ Page({
     const e1RM = topReps > 1 ? weight * (1 + topReps / 30) : weight;
     return { weight: weight, sets: sets, reps: totalReps, topReps: topReps, e1RM: Math.round(e1RM * 10) / 10, volume: Math.round(weight * totalReps) };
   },
+  // 只取组数：自重动作（引体/俯卧撑/平板）没有 kg，parseExMeta 会返回 null，
+  // 但部位组数仍需按实际组数统计，否则自重训练者的部位数据会被严重低估
+  countSets(meta) {
+    const p = this.parseExMeta(meta);
+    if (p && p.sets) return p.sets;
+    const m = /(\d+)\s*组/.exec(String(meta || ''));
+    if (m) return parseInt(m[1], 10) || 1;
+    return 1;
+  },
   // 按动作名收集历史记录（日期升序）
   collectExSeries() {
     const byName = {};
@@ -2275,7 +2296,21 @@ Page({
     }
     return byName;
   },
+  // 动作名 → 肌群（关键词匹配，未命中返回 null = 不计入部位统计）
+  matchMuscle(name) {
+    const s = String(name || '').toLowerCase();
+    if (!s) return null;
+    for (let i = 0; i < MUSCLE_RULES.length; i++) {
+      const r = MUSCLE_RULES[i];
+      for (let j = 0; j < r.kw.length; j++) {
+        if (s.indexOf(r.kw[j].toLowerCase()) >= 0) return { key: r.key, label: r.label };
+      }
+    }
+    return null;
+  },
   buildTrainingReport(weekly) {
+    const today = new Date();
+    const dstr = d => d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     const byName = this.collectExSeries();
     const names = Object.keys(byName);
     // 力量：同动作 e1RM，最近一次 vs 至少 21 天前的最近一次
@@ -2283,22 +2318,37 @@ Page({
     for (let i = 0; i < names.length; i++) {
       const seq = byName[names[i]];
       if (seq.length < 2) continue;
-      const last = seq[seq.length - 1];
-      const lastT = new Date(last.date).getTime();
-      let base = null;
-      for (let k = seq.length - 2; k >= 0; k--) {
-        if ((lastT - new Date(seq[k].date).getTime()) / 86400000 >= 21) { base = seq[k]; break; }
+      const todayT = new Date(dstr(today)).getTime();
+      // 只看近 12 周：极旧数据不该影响「现在」的趋势判断
+      const pts = seq.filter(p => (todayT - new Date(p.date).getTime()) / 86400000 <= 84);
+      if (pts.length < 2) continue;
+      let from, to, pct;
+      if (pts.length >= 3) {
+        // 3 点以上用最小二乘拟合整条趋势线，而不是首末两点：
+        // 单次状态差（熬夜/生病/热身不足）会让两点对比误判成退步
+        const xs = pts.map(p => (new Date(p.date).getTime() - todayT) / 86400000);
+        const ys = pts.map(p => p.e1RM);
+        const n = pts.length;
+        const mx = xs.reduce((s, x) => s + x, 0) / n;
+        const my = ys.reduce((s, y) => s + y, 0) / n;
+        let num = 0, den = 0;
+        for (let k = 0; k < n; k++) { num += (xs[k] - mx) * (ys[k] - my); den += (xs[k] - mx) * (xs[k] - mx); }
+        const slope = den > 0 ? num / den : 0;
+        const span = xs[n - 1] - xs[0];
+        from = Math.round((my + slope * (xs[0] - mx)) * 10) / 10;
+        to = Math.round((my + slope * (xs[n - 1] - mx)) * 10) / 10;
+        // 统一折算成「每 4 周变化率」；跨度不足 14 天不给结论（噪声大于信号）
+        pct = (my > 0 && span >= 14) ? (slope * 28) / my * 100 : 0;
+      } else {
+        const span = (new Date(pts[1].date).getTime() - new Date(pts[0].date).getTime()) / 86400000;
+        from = pts[0].e1RM; to = pts[1].e1RM;
+        pct = (pts[0].e1RM > 0 && span >= 14) ? (to - from) / from / span * 28 * 100 : 0;
       }
-      if (!base) base = seq[0];
-      if (base.date === last.date) continue;
-      const pct = base.e1RM > 0 ? (last.e1RM - base.e1RM) / base.e1RM * 100 : 0;
-      strength.push({ name: names[i], from: base.e1RM, to: last.e1RM, pct: Math.round(pct * 10) / 10, pctTxt: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct > 0 });
+      strength.push({ name: names[i], from: from, to: to, n: pts.length, pct: Math.round(pct * 10) / 10, pctTxt: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct > 0 });
     }
     strength.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
     const strengthTop = strength.slice(0, 3);
     // 容量：最近 7 天 vs 前 7 天
-    const today = new Date();
-    const dstr = d => d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     const volBetween = (from, to) => {
       let v = 0;
       for (let i = from; i < to; i++) {
@@ -2349,6 +2399,43 @@ Page({
       statusText = '平台期';
       advice = '变化不明显：换 1~2 个动作变式，或调整组次（如 4×8 → 5×5），同时确认热量和蛋白质够。';
     }
+    // 部位周组数：近 7 天按动作名映射肌群（循证区间 10~20 组/周/部位，过低刺激不足、过高恢复吃紧）
+    const muscleSets = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const h = this.state.history[dstr(d)];
+      if (!h || !h.trained) continue;
+      const mNames = h.exNames || [], mMetas = h.exMeta || [];
+      for (let j = 0; j < mNames.length; j++) {
+        const mg = this.matchMuscle(mNames[j]);
+        if (!mg || mg.key === 'cardio') continue; // 有氧不计入部位组数（容量区块已覆盖）
+        // 没记组数按 1 组保守计入；自重动作按 meta 里的组数记
+        muscleSets[mg.key] = (muscleSets[mg.key] || 0) + this.countSets(mMetas[j]);
+      }
+    }
+    const muscles = Object.keys(muscleSets).map(k => {
+      const s = muscleSets[k];
+      const level = s < 10 ? 'low' : (s > 20 ? 'high' : 'ok');
+      let label = k;
+      for (let i = 0; i < MUSCLE_RULES.length; i++) { if (MUSCLE_RULES[i].key === k) { label = MUSCLE_RULES[i].label; break; } }
+      return { key: k, label: label, sets: s, level: level, state: level === 'low' ? '偏少' : (level === 'high' ? '偏多' : '合适') };
+    }).sort((a, b) => b.sets - a.sets);
+    // 减量提醒：近 8 周容量连续上升 ≥4 周、且最近一周仍练得够 → 该安排减量周
+    const weekVol = [];
+    for (let w = 7; w >= 0; w--) weekVol[w] = volBetween((7 - w) * 7, (7 - w) * 7 + 7);
+    let upWeeks = 0;
+    for (let i = 7; i >= 1; i--) {
+      if (weekVol[i] > 0 && weekVol[i] > weekVol[i - 1]) upWeeks++;
+      else break;
+    }
+    const deload = { need: upWeeks >= 4 && weekVol[7] > 0 && weekly[7].count >= 3, weeks: upWeeks };
+    if (muscles.length >= 2) {
+      const hi = muscles[0], lo = muscles[muscles.length - 1];
+      if (hi.sets - lo.sets >= 12 && lo.level === 'low') {
+        advice += ' 部位分配不均：' + hi.label + ' ' + hi.sets + ' 组 vs ' + lo.label + ' ' + lo.sets + ' 组，优先补 ' + lo.label + '。';
+      }
+    }
+    if (deload.need) advice += ' 已连续 ' + deload.weeks + ' 周加量，建议安排一个减量周（容量砍半、重量降 10%）。';
     // 自感强度 RPE：近 28 天记录。RPE 是「同一个重量练起来更轻松了吗」的直接证据，
     // 力量没涨但 RPE 在降 = 体能恢复变好；RPE 持续偏高 = 恢复不足，需减量。
     const since28 = new Date(today); since28.setDate(today.getDate() - 28);
@@ -2379,7 +2466,7 @@ Page({
       else if (advice) advice = advice + (rpeList.length >= 3 ? ' ' + hint : '');
     }
     const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
-    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0;
+    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0;
     this.setData({
       report: {
         hasData: hasData,
@@ -2387,6 +2474,8 @@ Page({
         strength: { items: strengthTop, count: strength.length },
         volume: { text: fmtVol(v7), pctTxt: vPrev7 > 0 ? (volPct >= 0 ? '+' : '') + volPct.toFixed(0) + '%' : '—', up: volPct > 0 },
         consistency: { recent: recent4.toFixed(1), diff: (recent4 - prev4).toFixed(1), up: recent4 - prev4 >= 0 },
+        muscles: { items: muscles },
+        deload: deload,
         rpe: rpe,
         body: {
           now: wNow,

@@ -208,6 +208,13 @@
           <text class="rpt-line__v">{{item.from}} → {{item.to}} kg · {{item.pctTxt}}</text>
         </view>
       </view>
+      <view wx:if="{{report.muscles.items.length}}" class="rpt-sec">
+        <text class="rpt-sec__t">近 7 天部位组数（10~20 组合适）</text>
+        <view wx:for="{{report.muscles.items}}" wx:key="key" class="rpt-line">
+          <text class="rpt-line__k">{{item.label}}</text>
+          <text class="rpt-line__v rpt-line__v--{{item.level}}">{{item.sets}} 组 · {{item.state}}</text>
+        </view>
+      </view>
       <view wx:if="{{report.body.now}}" class="rpt-sec">
         <text class="rpt-sec__t">身体成分</text>
         <view class="rpt-line">

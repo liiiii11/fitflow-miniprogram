@@ -235,6 +235,9 @@
 .rpt-line:last-child { border-bottom: none; }
 .rpt-line__k { color: var(--text); }
 .rpt-line__v { color: var(--muted); font-size: 12px; }
+.rpt-line__v--ok { color: var(--accent); }
+.rpt-line__v--low { color: var(--muted); }
+.rpt-line__v--high { color: var(--danger); }
 .rpt-advice { font-size: 12px; line-height: 1.7; color: var(--text); background: var(--rule); border-radius: 10px; padding: 10px 12px; }
 
 /* ============ 计划 ============ */
