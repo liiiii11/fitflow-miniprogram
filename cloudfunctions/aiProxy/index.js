@@ -1,6 +1,6 @@
 // cloudfunctions/aiProxy/index.js
 // 代理智谱 GLM-4-Flash。Key 存于云函数环境变量 ZHIPU_API_KEY，前端永不接触 key。
-// actions: test | foodCalAI | queryMet | calibrateBurn | analyzeGrowth | chat
+// actions: test | foodCalAI | queryMet | calibrateBurn | chat
 const cloud = require('wx-server-sdk');
 const https = require('https');
 
@@ -78,15 +78,22 @@ async function callOnce(model, messages, opts, key) {
 let LAST_GOOD_MODEL = null;
 
 // 调用智谱：按候选型号依次尝试，第一个可用即返回（型号下线/限流自动兼容）
+// opts.budget：总耗时预算（毫秒，默认 15000）——模型回退链每次最多耗 opts.timeout(默认9s)，
+// 若无预算控制，最坏 3 个型号 × 9s = 27s 会撞上云函数平台超时（errCode -504003）
 async function chatZhipu(messages, opts = {}) {
   const key = process.env.ZHIPU_API_KEY;
   if (!key) return { ok: false, fatal: true, msg: '未配置 ZHIPU_API_KEY（请在云函数环境变量中设置）' };
+  const budget = opts.budget || 15000;
+  const perCall = opts.timeout || 9000;
+  const start = Date.now();
   const list = [].concat(opts.model ? [opts.model] : []).concat(LAST_GOOD_MODEL ? [LAST_GOOD_MODEL] : []).concat([DEFAULT_MODEL]).concat(MODEL_CANDIDATES);
   const tried = [];
   let last = { ok: false, msg: '未知错误' };
   for (let i = 0; i < list.length; i++) {
     const m = list[i];
     if (!m || tried.indexOf(m) >= 0) continue;
+    // 剩余预算不足以再完成一次完整请求时停止尝试（至少已试过一次）
+    if (tried.length > 0 && Date.now() - start + perCall > budget) break;
     tried.push(m);
     const r = await callOnce(m, messages, opts, key);
     if (r.ok) { LAST_GOOD_MODEL = m; r.tried = tried; return r; }
@@ -188,20 +195,6 @@ exports.main = async (event) => {
         kcal: (item && isFinite(Number(item.kcal)) && Number(item.kcal) > 0) ? Math.round(Math.min(Number(item.kcal), 400)) : null
       })).filter(x => x.kcal != null);
       return { ok: true, list: out };
-    }
-
-    // 训练长进 AI 分析（对应原版 analyzeGrowth）
-    if (action === 'analyzeGrowth') {
-      const wText = (weekly || []).map(w => w.label + ':' + w.count + '天').join('，');
-      const dText = (details || []).join('\n');
-      const pText = (progress && progress.length) ? '\n\n同动作重量变化（按时间先后）:\n' + progress.join('\n') : '';
-      const r = await chatZhipu([{
-        role: 'user',
-        content: `你是健身教练。用户近8周每周训练天数：${wText}。最近训练明细：\n${dText}${pText}\n请用80字内中文分析训练频率趋势、动作重量进步、部位均衡，给1条建议。直接输出，不要markdown。`
-      }], { temperature: 0.6, max_tokens: 200 });
-      if (!r.ok) return r;
-      const clean = (r.text || '').replace(/```[\s\S]*?```/g, '').replace(/[*_#>]/g, '').trim();
-      return { ok: true, text: clean };
     }
 
     if (action === 'chat') {

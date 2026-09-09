@@ -32,8 +32,6 @@ function getBurnCache() { return get(KEYS.BURN_CACHE, {}); }
 function setBurnCache(c) { set(KEYS.BURN_CACHE, c); }
 
 // 成长分析缓存
-function getGrowth() { return get(KEYS.GROWTH, null); }
-function setGrowth(obj) { set(KEYS.GROWTH, obj); }
 
 function clearAll() {
   try { wx.clearStorageSync(); } catch (e) {}
@@ -44,6 +42,5 @@ module.exports = {
   loadAppState, saveAppState,
   getFoodCache, setFoodCache,
   getBurnCache, setBurnCache,
-  getGrowth, setGrowth,
   clearAll
 };

@@ -158,13 +158,11 @@
       <text>多</text>
     </view>
   </view>
-  <!-- 训练长进 -->
+  <!-- 近 8 周训练 -->
   <view class="pg-box">
     <view class="pg-box__head">
-      <text class="pg-box__title">训练长进</text>
-      <view wx:if="{{growthHasRefresh}}" class="pg-box__refresh {{growthLoading?'loading':''}}" bindtap="analyzeGrowth" data-force="1">↻</view>
+      <text class="pg-box__title">近 8 周训练</text>
     </view>
-    <view class="pg-growth-text">{{growthText}}</view>
     <view class="growth-bars">
       <view wx:for="{{growthBars}}" wx:key="index" class="growth-bar-col">
         <view style="font-size:9px;font-weight:600;color:{{item.textColor}}">{{item.count||''}}</view>
@@ -181,6 +179,45 @@
   <view class="pg-row"><text>本月训练</text><text class="pg-row__num">{{monthTrain}}</text></view>
   <view class="pg-row"><text>连续打卡</text><text class="pg-row__num">{{streakDays}}</text></view>
   <view class="pg-row"><text>累计训练</text><text class="pg-row__num">{{totalTrain}}</text></view>
+  <!-- 训练报告（纯本地计算） -->
+  <view class="pg-box">
+    <view class="pg-box__head">
+      <text class="pg-box__title">训练报告</text>
+      <text class="rpt-badge rpt-badge--{{report.status}}">{{report.statusText}}</text>
+    </view>
+    <view wx:if="{{!report.hasData}}" class="pg-growth-text">还没有足够的记录。完成 2~3 次训练后，这里会给出力量、容量与坚持度的评估。</view>
+    <block wx:else>
+      <view class="rpt-grid">
+        <view class="rpt-cell">
+          <text class="rpt-cell__k">近 7 天容量</text>
+          <text class="rpt-cell__v">{{report.volume.text}} <text class="rpt-delta">{{report.volume.pctTxt}}</text></text>
+        </view>
+        <view class="rpt-cell">
+          <text class="rpt-cell__k">近 4 周频率</text>
+          <text class="rpt-cell__v">{{report.consistency.recent}} 天/周 <text class="rpt-delta">{{report.consistency.diff}}</text></text>
+        </view>
+      </view>
+      <view wx:if="{{report.strength.items.length}}" class="rpt-sec">
+        <text class="rpt-sec__t">力量（e1RM 变化）</text>
+        <view wx:for="{{report.strength.items}}" wx:key="name" class="rpt-line">
+          <text class="rpt-line__k">{{item.name}}</text>
+          <text class="rpt-line__v">{{item.from}} → {{item.to}} kg · {{item.pctTxt}}</text>
+        </view>
+      </view>
+      <view wx:if="{{report.body.now}}" class="rpt-sec">
+        <text class="rpt-sec__t">身体成分</text>
+        <view class="rpt-line">
+          <text class="rpt-line__k">当前体重</text>
+          <text class="rpt-line__v">{{report.body.now}} kg<block wx:if="{{report.body.delta}}"> · 30 天 {{report.body.delta}} kg</block></text>
+        </view>
+        <view wx:if="{{report.body.goalGap}}" class="rpt-line">
+          <text class="rpt-line__k">距目标</text>
+          <text class="rpt-line__v">{{report.body.goalGap}} kg</text>
+        </view>
+      </view>
+      <view class="rpt-advice">{{report.advice}}</view>
+    </block>
+  </view>
 </view>
 
 <!-- PROFILE -->

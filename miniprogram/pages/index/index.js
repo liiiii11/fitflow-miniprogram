@@ -137,7 +137,7 @@ Page({
     planEditorTitle: '新建计划', planName: '', newDayName: '', planDaysView: [],
     dayEditorTitle: '', dayExName: '', dayExList: [],
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [],
-    growthText: '', growthBars: [], growthHasRefresh: false, growthLoading: false,
+    growthBars: [], report: { hasData: false },
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
     aiStatus: 'AI 查询',
     // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致；iOS 已开通苹果 IAP，双端显示
@@ -2014,7 +2014,7 @@ Page({
     this._heatMonth = now.getMonth();
     this.renderHeatmap();
     this.updateProgressStats();
-    this.analyzeGrowth(false);
+    this.renderGrowthSection();
   },
   heatPrevMonth() {
     this._heatMonth--;
@@ -2124,64 +2124,6 @@ Page({
     this.setData({ weekTrain: weekTrained + '/7', totalTrain: totalTrainDays + ' 天', streakDays: streak + ' 天' });
   },
 
-  // ==================== TRAINING GROWTH (AI) ====================
-  buildGrowthContext() {
-    const now = new Date();
-    const dayOfWeek = now.getDay() || 7;
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - dayOfWeek + 1);
-    const weekly = [];
-    for (let w = 7; w >= 0; w--) {
-      const start = new Date(weekStart);
-      start.setDate(weekStart.getDate() - w * 7);
-      let count = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        const ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-        const h = this.state.history[ds];
-        if (h && h.trained) count++;
-      }
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      weekly.push({ label: (start.getMonth() + 1) + '/' + start.getDate(), end: (end.getMonth() + 1) + '/' + end.getDate(), count: count });
-    }
-    const dates = Object.keys(this.state.history).sort();
-    const details = [];
-    for (let i = dates.length - 1; i >= 0 && details.length < 12; i--) {
-      const h = this.state.history[dates[i]];
-      if (h && h.trained) {
-        const exs = (h.exNames || []).map((n, idx) => n + ((h.exMeta && h.exMeta[idx]) ? '(' + h.exMeta[idx] + ')' : '')).join('、');
-        details.push(dates[i].slice(5) + ' ' + (h.dayName || '训练') + (h.burn ? ' 消耗' + h.burn + 'kcal' : '') + (exs ? ' [' + exs + ']' : ''));
-      }
-    }
-    // 同动作重量进步序列（供 AI 对比重量长进，最多 6 条）
-    const progMap = {};
-    for (let i = 0; i < dates.length; i++) {
-      const h = this.state.history[dates[i]];
-      if (!h || !h.trained) continue;
-      (h.exNames || []).forEach((n, idx) => {
-        const meta = (h.exMeta && h.exMeta[idx]) || '';
-        const wm = /(\d+(?:\.\d+)?)\s*kg/.exec(meta);
-        if (!wm) return;
-        const key = String(n || '').trim();
-        if (!progMap[key]) progMap[key] = [];
-        progMap[key].push({ date: dates[i], kg: parseFloat(wm[1]) });
-      });
-    }
-    const progress = [];
-    Object.keys(progMap).forEach(name => {
-      const seq = progMap[name];
-      if (seq.length < 2) return;
-      const first = seq[0], last = seq[seq.length - 1];
-      if (Math.abs(last.kg - first.kg) >= 0.5) {
-        progress.push(name + ': ' + first.date.slice(5) + ' ' + first.kg + 'kg → ' + last.date.slice(5) + ' ' + last.kg + 'kg');
-      }
-    });
-    progress.sort();
-    progress.splice(0, Math.max(0, progress.length - 6));
-    return { weekly, details, progress };
-  },
   renderGrowthBars(weekly) {
     const maxCount = Math.max.apply(null, [1].concat(weekly.map(w => w.count)));
     const colors = {
@@ -2215,47 +2157,174 @@ Page({
     });
     this.setData({ growthBars: bars });
   },
-  analyzeGrowth(force) {
-    const { weekly, details, progress } = this.buildGrowthContext();
+  // ==================== 训练报告（纯本地计算，不依赖 AI） ====================
+  // 近 8 周每周训练天数（柱状图 + 报告一致性）
+  buildWeeklyCounts() {
+    const now = new Date();
+    const dayOfWeek = now.getDay() || 7;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - dayOfWeek + 1);
+    const weekly = [];
+    for (let w = 7; w >= 0; w--) {
+      const start = new Date(weekStart);
+      start.setDate(weekStart.getDate() - w * 7);
+      let count = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+        const h = this.state.history[ds];
+        if (h && h.trained) count++;
+      }
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      weekly.push({ label: (start.getMonth() + 1) + '/' + start.getDate(), end: (end.getMonth() + 1) + '/' + end.getDate(), count: count });
+    }
+    return weekly;
+  },
+  renderGrowthSection() {
+    const weekly = this.buildWeeklyCounts();
     this.renderGrowthBars(weekly);
-    const trainedDays = details.length;
-    if (trainedDays === 0) {
-      this.setData({ growthText: '还没有训练记录。完成一次训练后，AI 会在这里分析你的长进。', growthHasRefresh: false });
-      return;
-    }
-    if (!force) {
-      const c = storage.getGrowth();
-      if (c && c.date === todayKey() && c.text) {
-        this.setData({ growthText: c.text, growthHasRefresh: true });
-        return;
+    this.buildTrainingReport(weekly);
+  },
+  // 解析动作 meta："60kg 4组*10" / "60kg 4组*12+10+8" / "60kg"
+  parseExMeta(meta) {
+    const s = String(meta || '');
+    const wm = /(\d+(?:\.\d+)?)\s*kg/.exec(s);
+    if (!wm) return null;
+    const weight = parseFloat(wm[1]);
+    let sets = 0, totalReps = 0, topReps = 0;
+    const sm = /(\d+)\s*组\s*\*\s*([\d+]+)/.exec(s);
+    if (sm) {
+      sets = parseInt(sm[1], 10) || 0;
+      const parts = sm[2].split('+');
+      topReps = parseInt(parts[0], 10) || 0;
+      totalReps = parts.length > 1
+        ? parts.reduce((a, x) => a + (parseInt(x, 10) || 0), 0)
+        : sets * topReps;
+    } else {
+      const so = /(\d+)\s*组/.exec(s);
+      if (so) sets = parseInt(so[1], 10) || 0;
+      const ro = /\*\s*([\d+]+)/.exec(s);
+      if (ro) {
+        const parts = ro[1].split('+');
+        topReps = parseInt(parts[0], 10) || 0;
+        totalReps = parts.reduce((a, x) => a + (parseInt(x, 10) || 0), 0);
       }
     }
-    this.setData({ growthLoading: true, growthText: 'AI 正在分析你的训练长进…', growthHasRefresh: true });
-    const self = this;
-    // 本地降级分析（AI 不可用/失败时），并显示失败原因方便排查
-    const fallback = (errMsg) => {
-      const recent = weekly.slice(-4).reduce((s, w) => s + w.count, 0) / 4;
-      const before = weekly.slice(0, 4).reduce((s, w) => s + w.count, 0) / 4;
-      const diff = recent - before;
-      const diffTxt = (diff >= 0 ? '+' : '') + diff.toFixed(1);
-      const trend = diff >= 0 ? '提升' : '下降';
-      const pTxt = (progress && progress.length) ? '\n重量进步: ' + progress.join('；') : '';
-      const aiHint = errMsg ? '\nAI 未生效：' + errMsg + '。部署云函数并配置 Key 后点 ↻ 重新分析' : '\n（开启 AI 后可基于训练计划与动作重量生成个性化长进分析）';
-      self.setData({
-        growthText: '近 4 周平均每周 ' + recent.toFixed(1) + ' 天，比前 4 周（' + before.toFixed(1) + ' 天）' + trend + ' ' + diffTxt + ' 天/周' + pTxt + aiHint,
-        growthLoading: false
-      });
+    // e1RM（Epley）：没记次数时保守取重量本身
+    const e1RM = topReps > 1 ? weight * (1 + topReps / 30) : weight;
+    return { weight: weight, sets: sets, reps: totalReps, topReps: topReps, e1RM: Math.round(e1RM * 10) / 10, volume: Math.round(weight * totalReps) };
+  },
+  // 按动作名收集历史记录（日期升序）
+  collectExSeries() {
+    const byName = {};
+    const dates = Object.keys(this.state.history || {}).sort();
+    for (let i = 0; i < dates.length; i++) {
+      const h = this.state.history[dates[i]];
+      if (!h || !h.trained) continue;
+      const names = h.exNames || [];
+      const metas = h.exMeta || [];
+      for (let j = 0; j < names.length; j++) {
+        const p = this.parseExMeta(metas[j]);
+        if (!p || !p.weight) continue;
+        const key = String(names[j] || '').trim();
+        if (!key) continue;
+        if (!byName[key]) byName[key] = [];
+        byName[key].push({ date: dates[i], weight: p.weight, e1RM: p.e1RM, volume: p.volume });
+      }
+    }
+    return byName;
+  },
+  buildTrainingReport(weekly) {
+    const byName = this.collectExSeries();
+    const names = Object.keys(byName);
+    // 力量：同动作 e1RM，最近一次 vs 至少 21 天前的最近一次
+    const strength = [];
+    for (let i = 0; i < names.length; i++) {
+      const seq = byName[names[i]];
+      if (seq.length < 2) continue;
+      const last = seq[seq.length - 1];
+      const lastT = new Date(last.date).getTime();
+      let base = null;
+      for (let k = seq.length - 2; k >= 0; k--) {
+        if ((lastT - new Date(seq[k].date).getTime()) / 86400000 >= 21) { base = seq[k]; break; }
+      }
+      if (!base) base = seq[0];
+      if (base.date === last.date) continue;
+      const pct = base.e1RM > 0 ? (last.e1RM - base.e1RM) / base.e1RM * 100 : 0;
+      strength.push({ name: names[i], from: base.e1RM, to: last.e1RM, pct: Math.round(pct * 10) / 10, pctTxt: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct > 0 });
+    }
+    strength.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+    const strengthTop = strength.slice(0, 3);
+    // 容量：最近 7 天 vs 前 7 天
+    const today = new Date();
+    const dstr = d => d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    const volBetween = (from, to) => {
+      let v = 0;
+      for (let i = from; i < to; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const h = this.state.history[dstr(d)];
+        if (!h || !h.trained) continue;
+        (h.exMeta || []).forEach(m => { const p = this.parseExMeta(m); if (p) v += p.volume; });
+      }
+      return v;
     };
-    ai.analyzeGrowth(weekly, details, progress).then(r => {
-      if (r && r.ok && r.text) {
-        self.setData({ growthText: r.text, growthLoading: false });
-        storage.setGrowth({ date: todayKey(), text: r.text });
-      } else {
-        fallback((r && r.msg) ? String(r.msg).slice(0, 80) : '');
+    const v7 = volBetween(0, 7);
+    const vPrev7 = volBetween(7, 14);
+    const volPct = vPrev7 > 0 ? (v7 - vPrev7) / vPrev7 * 100 : (v7 > 0 ? 100 : 0);
+    // 一致性：近 4 周 vs 前 4 周
+    const avgOf = arr => arr.reduce((s, w) => s + w.count, 0) / (arr.length || 1);
+    const recent4 = avgOf(weekly.slice(-4));
+    const prev4 = avgOf(weekly.slice(0, 4));
+    // 身体成分：最近体重 vs 30 天前
+    const mh = (this.state.metrics && this.state.metrics.history) || [];
+    let wNow = null, wThen = null;
+    if (mh.length) {
+      wNow = mh[mh.length - 1].weight;
+      const t30 = new Date(today); t30.setDate(today.getDate() - 30);
+      for (let i = mh.length - 1; i >= 0; i--) {
+        if (new Date(mh[i].date).getTime() <= t30.getTime()) { wThen = mh[i].weight; break; }
       }
-    }).catch(err => {
-      const rawMsg = (err && (err.errMsg || err.message)) ? String(err.errMsg || err.message) : 'AI 调用失败';
-      fallback(rawMsg.slice(0, 80));
+      if (wThen == null && mh.length > 1) wThen = mh[0].weight;
+    }
+    const goalW = this.state.goalWeight || 0;
+    // 三态判定：优先看力量，无力量数据时退化为容量
+    let status = 'plateau', statusText = '平台期', advice = '';
+    const avgPct = strengthTop.length ? strengthTop.reduce((s, x) => s + x.pct, 0) / strengthTop.length : 0;
+    if (strengthTop.length) {
+      if (avgPct >= 2.5) status = 'progress';
+      else if (avgPct <= -2.5) status = 'regress';
+    } else if (vPrev7 > 0) {
+      if (volPct >= 5) status = 'progress';
+      else if (volPct <= -5) status = 'regress';
+    }
+    if (status === 'progress') {
+      statusText = '进步中';
+      advice = '力量和容量都在涨，保持当前计划，继续每周小幅加重量（约 +2.5%）。';
+    } else if (status === 'regress') {
+      statusText = '需要减量';
+      advice = '力量或容量下滑：安排一个减量周（容量砍半、重量降 10%），先把睡眠补足，恢复后再回原计划。';
+    } else {
+      statusText = '平台期';
+      advice = '变化不明显：换 1~2 个动作变式，或调整组次（如 4×8 → 5×5），同时确认热量和蛋白质够。';
+    }
+    const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
+    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0;
+    this.setData({
+      report: {
+        hasData: hasData,
+        status: status, statusText: statusText, advice: advice,
+        strength: { items: strengthTop, count: strength.length },
+        volume: { text: fmtVol(v7), pctTxt: vPrev7 > 0 ? (volPct >= 0 ? '+' : '') + volPct.toFixed(0) + '%' : '—', up: volPct > 0 },
+        consistency: { recent: recent4.toFixed(1), diff: (recent4 - prev4).toFixed(1), up: recent4 - prev4 >= 0 },
+        body: {
+          now: wNow,
+          delta: (wNow != null && wThen != null) ? Math.round((wNow - wThen) * 10) / 10 : null,
+          goalGap: (wNow != null && goalW) ? Math.round((wNow - goalW) * 10) / 10 : null
+        }
+      }
     });
   },
 

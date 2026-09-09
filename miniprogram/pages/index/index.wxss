@@ -212,6 +212,24 @@
 .growth-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 3px; }
 .growth-bar { width: 100%; max-width: 20px; border-radius: 4px 4px 2px 2px; }
 
+/* ============ 训练报告 ============ */
+.rpt-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--muted); color: var(--muted); }
+.rpt-badge--progress { border-color: var(--accent); color: var(--accent); }
+.rpt-badge--plateau { border-color: var(--muted); color: var(--muted); }
+.rpt-badge--regress { border-color: var(--danger); color: var(--danger); }
+.rpt-grid { display: flex; gap: 10px; margin-bottom: 12px; }
+.rpt-cell { flex: 1; border: 1px solid var(--rule); border-radius: 10px; padding: 10px; }
+.rpt-cell__k { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.rpt-cell__v { display: block; font-size: 17px; font-weight: 600; }
+.rpt-delta { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.rpt-sec { margin-bottom: 12px; }
+.rpt-sec__t { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.rpt-line { display: flex; align-items: baseline; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--rule); }
+.rpt-line:last-child { border-bottom: none; }
+.rpt-line__k { color: var(--text); }
+.rpt-line__v { color: var(--muted); font-size: 12px; }
+.rpt-advice { font-size: 12px; line-height: 1.7; color: var(--text); background: var(--rule); border-radius: 10px; padding: 10px 12px; }
+
 /* ============ 计划 ============ */
 .plan-card { padding: 14px 0; border-bottom: 1px solid var(--rule); }
 .plan-card:active { background: rgba(0, 0, 0, .02); }

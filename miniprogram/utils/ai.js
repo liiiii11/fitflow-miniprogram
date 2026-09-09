@@ -32,9 +32,4 @@ function calibrateBurn(items, weight) {
   return callAI('calibrateBurn', { items, weight });
 }
 
-// 训练长进分析：weekly=[{label,count}], details=[字符串], progress=[动作重量进步字符串]，返回 { ok, text }
-function analyzeGrowth(weekly, details, progress) {
-  return callAI('analyzeGrowth', { weekly, details, progress });
-}
-
-module.exports = { callAI, testAI, foodCalAI, queryMet, calibrateBurn, analyzeGrowth };
+module.exports = { callAI, testAI, foodCalAI, queryMet, calibrateBurn };
