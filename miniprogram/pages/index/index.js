@@ -2465,19 +2465,23 @@ Page({
       if (status === 'plateau' && rpeAvg >= 8.5) advice = hint + '当前力量没涨且自感强度高，先减量一周再回到原计划。';
       else if (advice) advice = advice + (rpeList.length >= 3 ? ' ' + hint : '');
     }
-    // 计划执行：本周实际训练天数 / 计划每周天数（计划 days 长度即每周频率）
+    // 计划执行：本周实际训练天数 / 一个完整循环的天数（days.length 即一个循环的动作日数）
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     const planDays = (plan && plan.days && plan.days.length) ? plan.days.length : 0;
     const actualDays = weekly[7].count;
-    const completion = { has: false, plan: planDays, actual: actualDays, rate: 0, state: '', stateTxt: '', txt: '' };
+    const completion = { has: false, plan: planDays, actual: actualDays, rate: 0, loops: 0, state: '', stateTxt: '', loopTxt: '', txt: '' };
     if (planDays > 0) {
       const rate = Math.round(actualDays / planDays * 100);
+      const loops = Math.floor(actualDays / planDays);
       completion.has = true;
       completion.rate = rate;
+      completion.loops = loops;
       if (rate >= 100) { completion.state = 'ok'; completion.stateTxt = '已达标'; }
       else if (rate >= 70) { completion.state = 'near'; completion.stateTxt = '接近'; }
       else { completion.state = 'low'; completion.stateTxt = '欠量'; }
-      completion.txt = '本周 ' + actualDays + ' 练 / 计划 ' + planDays + ' 天';
+      completion.loopTxt = loops >= 1 ? ('完成 ' + loops + ' 个循环') : ('达成 ' + rate + '%');
+      const tail = loops >= 1 ? ('本周已完成 ' + loops + ' 个循环') : ('距完成 1 个循环还差 ' + (planDays - actualDays) + ' 天');
+      completion.txt = '本周 ' + actualDays + ' 练 / 一个循环 ' + planDays + ' 天 · ' + tail;
     }
     // 新 PR：近 28 天内刷新的个人纪录（该动作最新 e1RM 为历史最高）
     const since28b = new Date(today); since28b.setDate(today.getDate() - 28);

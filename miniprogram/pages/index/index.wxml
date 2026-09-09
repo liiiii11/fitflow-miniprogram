@@ -458,7 +458,7 @@
         <text class="rpt-sec__t">计划执行</text>
         <view class="rpt-line">
           <text class="rpt-line__k">{{report.completion.txt}}</text>
-          <text class="rpt-line__v rpt-line__v--{{report.completion.state}}">达成 {{report.completion.rate}}% · {{report.completion.stateTxt}}</text>
+          <text class="rpt-line__v rpt-line__v--{{report.completion.state}}">{{report.completion.loopTxt}} · {{report.completion.stateTxt}}</text>
         </view>
       </view>
       <view wx:if="{{report.strength.items.length}}" class="rpt-sec">
