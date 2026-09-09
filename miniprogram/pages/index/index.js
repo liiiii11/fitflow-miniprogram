@@ -2465,8 +2465,57 @@ Page({
       if (status === 'plateau' && rpeAvg >= 8.5) advice = hint + '当前力量没涨且自感强度高，先减量一周再回到原计划。';
       else if (advice) advice = advice + (rpeList.length >= 3 ? ' ' + hint : '');
     }
+    // 计划执行：本周实际训练天数 / 计划每周天数（计划 days 长度即每周频率）
+    const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
+    const planDays = (plan && plan.days && plan.days.length) ? plan.days.length : 0;
+    const actualDays = weekly[7].count;
+    const completion = { has: false, plan: planDays, actual: actualDays, rate: 0, state: '', stateTxt: '', txt: '' };
+    if (planDays > 0) {
+      const rate = Math.round(actualDays / planDays * 100);
+      completion.has = true;
+      completion.rate = rate;
+      if (rate >= 100) { completion.state = 'ok'; completion.stateTxt = '已达标'; }
+      else if (rate >= 70) { completion.state = 'near'; completion.stateTxt = '接近'; }
+      else { completion.state = 'low'; completion.stateTxt = '欠量'; }
+      completion.txt = '本周 ' + actualDays + ' 练 / 计划 ' + planDays + ' 天';
+    }
+    // 新 PR：近 28 天内刷新的个人纪录（该动作最新 e1RM 为历史最高）
+    const since28b = new Date(today); since28b.setDate(today.getDate() - 28);
+    const prs = [];
+    for (let i = 0; i < names.length; i++) {
+      const seq = byName[names[i]];
+      if (seq.length < 2) continue;
+      const last = seq[seq.length - 1];
+      let isMax = true;
+      for (let k = 0; k < seq.length - 1; k++) { if (seq[k].e1RM > last.e1RM) { isMax = false; break; } }
+      if (isMax && new Date(last.date).getTime() >= since28b.getTime()) prs.push({ name: names[i], e1RM: last.e1RM, date: last.date });
+    }
+    prs.sort((a, b) => b.e1RM - a.e1RM);
+    const prItems = prs.slice(0, 4);
+    // 动作多样性：近 7 天不同动作数（防动作单一导致进步停滞）
+    const seenEx = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const h = this.state.history[dstr(d)];
+      if (!h || !h.trained) continue;
+      (h.exNames || []).forEach(n => { const k = String(n || '').trim(); if (k) seenEx[k] = 1; });
+    }
+    const varietyCount = Object.keys(seenEx).length;
+    const variety = { count: varietyCount, state: '', stateTxt: '', hint: '' };
+    if (varietyCount > 0) {
+      if (varietyCount < 4) { variety.state = 'low'; variety.stateTxt = '偏单一'; variety.hint = '动作偏单一，建议每 1~2 周换 1~2 个动作变式以保持刺激。'; }
+      else if (varietyCount > 12) { variety.state = 'high'; variety.stateTxt = '偏杂'; variety.hint = '动作较多，核心动作保持稳定才能积累渐进超负荷。'; }
+      else { variety.state = 'ok'; variety.stateTxt = '合适'; }
+    }
+    // 连续训练天数：从今天往前数连续 trained 的天数（今天没练则从昨天起算）
+    let streak = 0;
+    const sd0 = new Date(today);
+    if (!(this.state.history[dstr(sd0)] && this.state.history[dstr(sd0)].trained)) sd0.setDate(sd0.getDate() - 1);
+    while (this.state.history[dstr(sd0)] && this.state.history[dstr(sd0)].trained) { streak++; sd0.setDate(sd0.getDate() - 1); }
+    const trainedToday = !!(this.state.history[dstr(today)] && this.state.history[dstr(today)].trained);
+    const streakInfo = { days: streak, trainedToday: trainedToday };
     const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
-    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0;
+    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0 || varietyCount > 0;
     this.setData({
       report: {
         hasData: hasData,
@@ -2476,6 +2525,10 @@ Page({
         consistency: { recent: recent4.toFixed(1), diff: (recent4 - prev4).toFixed(1), up: recent4 - prev4 >= 0 },
         muscles: { items: muscles },
         deload: deload,
+        completion: completion,
+        prs: { items: prItems, count: prs.length },
+        variety: variety,
+        streak: streakInfo,
         rpe: rpe,
         body: {
           now: wNow,

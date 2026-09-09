@@ -239,7 +239,10 @@
 .rpt-line__v { color: var(--muted); font-size: 12px; }
 .rpt-line__v--ok { color: var(--accent); }
 .rpt-line__v--low { color: var(--muted); }
+.rpt-line__v--near { color: var(--text); font-weight: 500; }
 .rpt-line__v--high { color: var(--danger); }
+.rpt-tag { font-size: 10px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
+.rpt-more { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
 .rpt-advice { font-size: 12px; line-height: 1.7; color: var(--text); background: var(--rule); border-radius: 10px; padding: 10px 12px; }
 
 /* ============ 计划 ============ */

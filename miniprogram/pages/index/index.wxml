@@ -449,6 +449,17 @@
           <text class="rpt-cell__k">近 4 周频率</text>
           <text class="rpt-cell__v">{{report.consistency.recent}} 天/周 <text class="rpt-delta">{{report.consistency.diff}}</text></text>
         </view>
+        <view class="rpt-cell">
+          <text class="rpt-cell__k">连续训练</text>
+          <text class="rpt-cell__v">{{report.streak.days}} 天</text>
+        </view>
+      </view>
+      <view wx:if="{{report.completion.has}}" class="rpt-sec">
+        <text class="rpt-sec__t">计划执行</text>
+        <view class="rpt-line">
+          <text class="rpt-line__k">{{report.completion.txt}}</text>
+          <text class="rpt-line__v rpt-line__v--{{report.completion.state}}">达成 {{report.completion.rate}}% · {{report.completion.stateTxt}}</text>
+        </view>
       </view>
       <view wx:if="{{report.strength.items.length}}" class="rpt-sec">
         <text class="rpt-sec__t">力量（e1RM 变化）</text>
@@ -457,12 +468,28 @@
           <text class="rpt-line__v">{{item.from}} → {{item.to}} kg · {{item.pctTxt}}</text>
         </view>
       </view>
+      <view wx:if="{{report.prs.items.length}}" class="rpt-sec">
+        <text class="rpt-sec__t">新纪录（近 28 天）</text>
+        <view wx:for="{{report.prs.items}}" wx:key="name" class="rpt-line">
+          <text class="rpt-line__k">{{item.name}}<text class="rpt-tag">新纪录</text></text>
+          <text class="rpt-line__v">{{item.e1RM}} kg</text>
+        </view>
+        <view wx:if="{{report.prs.count > report.prs.items.length}}" class="rpt-more">+{{report.prs.count - report.prs.items.length}} 个动作</view>
+      </view>
       <view wx:if="{{report.muscles.items.length}}" class="rpt-sec">
         <text class="rpt-sec__t">近 7 天部位组数（10~20 组合适）</text>
         <view wx:for="{{report.muscles.items}}" wx:key="key" class="rpt-line">
           <text class="rpt-line__k">{{item.label}}</text>
           <text class="rpt-line__v rpt-line__v--{{item.level}}">{{item.sets}} 组 · {{item.state}}</text>
         </view>
+      </view>
+      <view wx:if="{{report.variety.count}}" class="rpt-sec">
+        <text class="rpt-sec__t">动作多样性</text>
+        <view class="rpt-line">
+          <text class="rpt-line__k">近 7 天不同动作</text>
+          <text class="rpt-line__v rpt-line__v--{{report.variety.state}}">{{report.variety.count}} 个 · {{report.variety.stateTxt}}</text>
+        </view>
+        <view wx:if="{{report.variety.hint}}" class="rpt-advice" style="margin-top:6px">{{report.variety.hint}}</view>
       </view>
       <view wx:if="{{report.body.now}}" class="rpt-sec">
         <text class="rpt-sec__t">身体成分</text>
