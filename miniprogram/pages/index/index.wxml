@@ -31,6 +31,10 @@
       <view class="stat__num">{{waterMl}}</view>
       <view class="stat__lbl">饮水 ml</view>
     </view>
+    <view style="flex:0.62" bindtap="openRpe">
+      <view class="stat__num {{rpeVal?'stat__num--accent':''}}">{{rpeVal || '—'}}</view>
+      <view class="stat__lbl">强度 RPE</view>
+    </view>
   </view>
 
   <!-- MAIN: 训练 + 补剂 / 饮食 + 有氧（纵向排列，整页滚动；力量训练完整展开，饮食也完整显示） -->
@@ -62,17 +66,6 @@
             <view class="item__del" catchtap="confirmDelEx" data-i="{{item.i}}">删除</view>
             <view class="item__check {{item.done?'done':''}}" catchtap="toggleEx" data-i="{{item.i}}"></view>
           </view>
-        </view>
-        <!-- 今日自感强度 RPE：1 很轻松 → 10 完全力竭 -->
-        <view class="rpe">
-          <view class="rpe__head">
-            <text class="rpe__t">今日强度 RPE</text>
-            <text wx:if="{{rpeVal}}" class="rpe__cur">{{rpeVal}} · {{rpeText}}</text>
-          </view>
-          <view class="rpe__chips">
-            <view wx:for="{{rpeChips}}" wx:key="*this" class="rpe-chip {{rpeVal===item?'on':''}}" bindtap="setRpe" data-v="{{item}}">{{item}}</view>
-          </view>
-          <text class="rpe__hint">{{rpeHint}}</text>
         </view>
       </view>
       <!-- 有氧 -->
@@ -465,6 +458,25 @@
     <view wx:if="{{rewardBusy}}" style="text-align:center;font-size:12px;color:var(--muted);margin-top:14px">正在拉起支付…</view>
     <view wx:if="{{rewardErr}}" style="text-align:center;font-size:12px;color:var(--danger);margin-top:14px">{{rewardErr}}</view>
     <button class="btn btn--ghost btn--fw" style="margin-top:16px" bindtap="closeOverlay">{{rewardBusy?'关闭':'先不了'}}</button>
+  </view>
+</view>
+
+<!-- 今日自感强度 RPE（1 很轻松 → 10 完全力竭） -->
+<view wx:if="{{modalOverlay==='rpe'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
+  <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
+    <view class="sheet__title">今日强度 RPE</view>
+    <view style="font-size:12px;color:var(--muted);margin:-4px 0 4px">训练后选一下：1 很轻松 → 10 完全力竭</view>
+    <view class="rpe-pick">
+      <view wx:for="{{rpeChips}}" wx:key="*this" class="rpe-pick__i {{rpeVal===item?'on':''}}" bindtap="setRpe" data-v="{{item}}">{{item}}</view>
+    </view>
+    <view class="rpe-legend">
+      <text>轻松</text><text>有点吃力</text><text>吃力</text><text>力竭</text>
+    </view>
+    <view style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">{{rpeVal ? '当前：' + rpeVal + ' · ' + rpeText : '今天还没记录'}}</view>
+    <view style="display:flex;gap:12px;margin-top:18px">
+      <button wx:if="{{rpeVal}}" class="btn btn--ghost" style="flex:1" bindtap="clearRpe">清除</button>
+      <button class="btn btn--ghost" style="flex:1" bindtap="closeOverlay">关闭</button>
+    </view>
   </view>
 </view>
 

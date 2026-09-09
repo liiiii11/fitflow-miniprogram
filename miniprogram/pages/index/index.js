@@ -139,7 +139,7 @@ Page({
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [],
     growthBars: [], report: { hasData: false },
     // 今日自感强度 RPE（1~10，写入 history[今天].rpe）
-    rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '', rpeHint: '',
+    rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '',
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
     aiStatus: 'AI 查询',
     // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致；iOS 已开通苹果 IAP，双端显示
@@ -588,6 +588,7 @@ Page({
     if (v <= 8) return '吃力';
     return '接近力竭';
   },
+  openRpe() { this.showModal('rpe'); },
   setRpe(e) {
     const v = parseInt(e.currentTarget.dataset.v, 10);
     if (!(v >= 1 && v <= 10)) return;
@@ -598,16 +599,20 @@ Page({
     h.rpe = v;
     this.saveState();
     this.renderRpe();
+    this.closeOverlay();
     this.toast('已记录 RPE ' + v + ' · ' + this.rpeWord(v));
+  },
+  clearRpe() {
+    const h = this.state.history[todayKey()];
+    if (h) { delete h.rpe; this.saveState(); }
+    this.renderRpe();
+    this.closeOverlay();
+    this.toast('已清除今天的强度记录');
   },
   renderRpe() {
     const h = this.state.history[todayKey()];
     const v = (h && h.rpe) ? h.rpe : 0;
-    this.setData({
-      rpeVal: v,
-      rpeText: v ? this.rpeWord(v) : '',
-      rpeHint: v ? '同一个重量下 RPE 变低，说明你变强了。' : '训练后点一下：1 很轻松，10 完全力竭。'
-    });
+    this.setData({ rpeVal: v, rpeText: v ? this.rpeWord(v) : '' });
   },
   // 动作稳定 key：跨排序不变。否则提交排序后节点原地换内容，done(对勾)状态在
   // 错误位置翻转，.item__check 的 0.12s 过渡会闪现（打勾项与未打勾项互换位置时尤其明显）
