@@ -2487,7 +2487,7 @@ Page({
       if (seq.length < 2) continue;
       const last = seq[seq.length - 1];
       let isMax = true;
-      for (let k = 0; k < seq.length - 1; k++) { if (seq[k].e1RM > last.e1RM) { isMax = false; break; } }
+      for (let k = 0; k < seq.length - 1; k++) { if (seq[k].e1RM >= last.e1RM) { isMax = false; break; } }
       if (isMax && new Date(last.date).getTime() >= since28b.getTime()) prs.push({ name: names[i], e1RM: last.e1RM, date: last.date });
     }
     prs.sort((a, b) => b.e1RM - a.e1RM);
