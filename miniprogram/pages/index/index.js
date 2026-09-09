@@ -25,6 +25,7 @@ const MUSCLE_RULES = [
 ];
 
 // 默认计划（与原版一致）
+const HEAT_PALETTE = ['#EDEAE4', '#F4E3D9', '#ECCEBE', '#E4B59D', '#DA9A78', '#D07F5C', '#C25E40'];
 const DEFAULT_PLANS = [
   { id: 'ppl', name: '推拉腿训练', desc: '每周 6 天 · 增肌 · 推/拉/腿', tags: ['推日 4动作', '拉日 5动作', '腿日 5动作'],
     days: [
@@ -148,7 +149,7 @@ Page({
     planDetailApplyText: '使用此计划', planDetailApplyDisabled: false,
     planEditorTitle: '新建计划', planName: '', newDayName: '', planDaysView: [],
     dayEditorTitle: '', dayExName: '', dayExList: [],
-    heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [],
+    heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [], heatPalette: HEAT_PALETTE,
     growthBars: [], report: { hasData: false },
     // 今日自感强度 RPE（1~10，写入 history[今天].rpe）
     rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '',
@@ -2084,7 +2085,7 @@ Page({
     const firstDay = new Date(year, month, 1).getDay();
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
     const today = now.getDate();
-    const colors = ['#E8E5DF', '#ECD5CC', '#DEAA98', '#D07F64', '#D4785C'];
+    const colors = HEAT_PALETTE;
     // 当月训练数与最大消耗
     let trainedCount = 0, maxBurn = 0;
     for (let day = 1; day <= daysInMonth; day++) {
@@ -2101,10 +2102,13 @@ Page({
       let level = 0;
       if (h && h.trained && maxBurn > 0) {
         const ratio = (h.burn || 0) / maxBurn;
-        if (ratio >= 0.75) level = 4;
-        else if (ratio >= 0.5) level = 3;
-        else if (ratio >= 0.25) level = 2;
-        else level = 1;
+        if (ratio >= 0.85) level = 6;
+        else if (ratio >= 0.7) level = 5;
+        else if (ratio >= 0.5) level = 4;
+        else if (ratio >= 0.35) level = 3;
+        else if (ratio >= 0.2) level = 2;
+        else if (ratio > 0.05) level = 1;
+        else level = 0;
       }
       const isToday = isCurrentMonth && day === today;
       const isFuture = isCurrentMonth && day > today;
@@ -2177,33 +2181,33 @@ Page({
 
   renderGrowthBars(weekly) {
     const maxCount = Math.max.apply(null, [1].concat(weekly.map(w => w.count)));
-    const colors = {
-      0: '#E8E5DF',
-      a: '#ECD5CC',
-      b: '#DEAA98',
-      c: '#D07F64',
-      d: '#D4785C'
-    };
+    const colors = HEAT_PALETTE;
     const colorFor = count => {
       if (count === 0) return colors[0];
       const ratio = count / maxCount;
-      if (ratio >= 0.75) return colors.d;
-      if (ratio >= 0.5) return colors.c;
-      if (ratio >= 0.25) return colors.b;
-      return colors.a;
+      if (ratio >= 0.85) return colors[6];
+      if (ratio >= 0.7) return colors[5];
+      if (ratio >= 0.5) return colors[4];
+      if (ratio >= 0.35) return colors[3];
+      if (ratio >= 0.2) return colors[2];
+      if (ratio > 0.05) return colors[1];
+      return colors[1];
     };
     const bars = weekly.map((w, i) => {
       const isLatest = i === weekly.length - 1;
       const h = w.count === 0 ? 4 : Math.max(6, Math.round(w.count / maxCount * 100));
+      const base = colorFor(w.count);
+      const top = isLatest ? base : '#F4E3D9';
       return {
         count: w.count,
         h: h,
-        color: colorFor(w.count),
+        color: base,
+        bg: 'linear-gradient(180deg, ' + top + ', ' + base + ')',
         label: w.label,
         end: '~' + w.end,
         isLatest: isLatest,
         dim: w.count === 0,
-        textColor: isLatest ? '#D4785C' : '#9E9A93'
+        textColor: isLatest ? '#C25E40' : '#9E9A93'
       };
     });
     this.setData({ growthBars: bars });

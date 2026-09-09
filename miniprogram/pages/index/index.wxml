@@ -154,11 +154,7 @@
     <view class="heat-legend">
       <text style="margin-right:auto">当月对比</text>
       <text>少</text>
-      <view class="heat-sq" style="background:#E8E5DF"></view>
-      <view class="heat-sq" style="background:#ECD5CC"></view>
-      <view class="heat-sq" style="background:#DEAA98"></view>
-      <view class="heat-sq" style="background:#D07F64"></view>
-      <view class="heat-sq" style="background:#D4785C"></view>
+      <view wx:for="{{heatPalette}}" wx:key="index" class="heat-sq" style="background:{{item}}"></view>
       <text>多</text>
     </view>
   </view>
@@ -171,14 +167,14 @@
     <view class="growth-bars">
       <view wx:for="{{growthBars}}" wx:key="index" class="growth-bar-col">
         <view style="font-size:9px;font-weight:600;color:{{item.textColor}}">{{item.count||''}}</view>
-        <view class="growth-bar" style="height:{{item.h}}%;background:{{item.color}};{{item.dim?'opacity:.3;':''}}"></view>
+        <view class="growth-bar" style="height:{{item.h}}%;background:{{item.bg}};{{item.dim?'opacity:.3;':''}}"></view>
         <view style="display:flex;flex-direction:column;align-items:center;line-height:1.25">
           <text style="font-size:8px;color:{{item.textColor}}">{{item.label}}</text>
           <text style="font-size:8px;color:{{item.textColor}}">{{item.end}}</text>
         </view>
       </view>
     </view>
-    <view class="heat-legend"><text>近 8 周对比</text><text style="margin-left:auto">少</text><view class="heat-sq" style="background:#E8E5DF"></view><view class="heat-sq" style="background:#ECD5CC"></view><view class="heat-sq" style="background:#DEAA98"></view><view class="heat-sq" style="background:#D07F64"></view><view class="heat-sq" style="background:#D4785C"></view><text>多</text></view>
+    <view class="heat-legend"><text>近 8 周对比</text><text style="margin-left:auto">少</text><view wx:for="{{heatPalette}}" wx:key="index" class="heat-sq" style="background:{{item}}"></view><text>多</text></view>
   </view>
   <view class="pg-row"><text>本周训练</text><text class="pg-row__num pg-row__num--accent">{{weekTrain}}</text></view>
   <view class="pg-row"><text>本月训练</text><text class="pg-row__num">{{monthTrain}}</text></view>
