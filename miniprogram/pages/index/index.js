@@ -79,6 +79,10 @@ function todayKey(d) {
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 }
 
+function dstr(d) {
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
 function loadState() {
   try {
     const s = storage.loadAppState();
@@ -170,6 +174,19 @@ Page({
       { tier: 'r18', price: '18', label: '请吃一顿' }
     ],
     toast: '', toastShow: false
+  },
+
+  // 连续训练天数：从今天往前数连续 trained，今天没练则从昨天起算（与报告侧口径统一）
+  calcStreak() {
+    const today = new Date();
+    const sd = new Date(today);
+    if (!(this.state.history[dstr(sd)] && this.state.history[dstr(sd)].trained)) sd.setDate(sd.getDate() - 1);
+    let streak = 0;
+    while (this.state.history[dstr(sd)] && this.state.history[dstr(sd)].trained) {
+      streak++;
+      sd.setDate(sd.getDate() - 1);
+    }
+    return streak;
   },
 
   onLoad() {
@@ -2042,11 +2059,16 @@ Page({
               signature: d.signature,
               mode: d.mode || 'short_series_goods',
               success: () => {
-                reset();
-                this.closeOverlay();
+                // 立即关掉弹窗节点 + 清繁忙标志，避免 240ms 退场动画期间被二次点击重复下单
+                if (this._ovCloseTimer) { clearTimeout(this._ovCloseTimer); this._ovCloseTimer = null; }
+                this.setData({ rewardBusy: false, modalOverlay: '', ovClosing: false });
                 wx.showToast({ title: '感谢支持，请我喝杯咖啡吧 ❤', icon: 'none', duration: 2400 });
-                // 对账不阻塞 UI：确认订单状态仅作记录，失败不影响致谢
-                wx.cloud.callFunction({ name: 'payService', data: { action: 'confirm', outTradeNo: d.outTradeNo } });
+                // 对账不阻塞 UI：确认订单状态仅作记录，失败不影响致谢（仅留日志便于排查）
+                wx.cloud.callFunction({
+                  name: 'payService',
+                  data: { action: 'confirm', outTradeNo: d.outTradeNo },
+                  fail: (e) => { console.error('[pay] confirm fail', e); }
+                });
               },
               fail: f => {
                 reset();
@@ -2194,15 +2216,7 @@ Page({
     }
     let totalTrainDays = 0;
     Object.keys(this.state.history).forEach(k => { if (this.state.history[k].trained) totalTrainDays++; });
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      const dateStr = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-      const h = this.state.history[dateStr];
-      if (h && h.trained) streak++;
-      else { if (i === 0) continue; break; }
-    }
+    const streak = this.calcStreak();
     this.setData({ weekTrain: weekTrained + '/7', totalTrain: totalTrainDays + ' 天', streakDays: streak + ' 天' });
   },
 
@@ -2359,7 +2373,6 @@ Page({
   },
   buildTrainingReport(weekly) {
     const today = new Date();
-    const dstr = d => d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     const byName = this.collectExSeries();
     const names = Object.keys(byName);
     // 力量：同动作 e1RM，最近一次 vs 至少 21 天前的最近一次
@@ -2416,16 +2429,25 @@ Page({
     const avgOf = arr => arr.reduce((s, w) => s + w.count, 0) / (arr.length || 1);
     const recent4 = avgOf(weekly.slice(-4));
     const prev4 = avgOf(weekly.slice(0, 4));
-    // 身体成分：最近体重 vs 30 天前
+    // 身体成分：最近体重 vs 30 天前；找不到 ≥30 天前的记录时降级用"首次记录"
     const mh = (this.state.metrics && this.state.metrics.history) || [];
-    let wNow = null, wThen = null;
+    let wNow = null, wThen = null, wThenAgo = 0, wThenFallback = false;
     if (mh.length) {
       wNow = mh[mh.length - 1].weight;
       const t30 = new Date(today); t30.setDate(today.getDate() - 30);
       for (let i = mh.length - 1; i >= 0; i--) {
-        if (new Date(mh[i].date).getTime() <= t30.getTime()) { wThen = mh[i].weight; break; }
+        if (new Date(mh[i].date).getTime() <= t30.getTime()) {
+          wThen = mh[i].weight;
+          // 距今天数
+          wThenAgo = Math.floor((today.getTime() - new Date(mh[i].date).getTime()) / 86400000);
+          break;
+        }
       }
-      if (wThen == null && mh.length > 1) wThen = mh[0].weight;
+      if (wThen == null && mh.length > 1) {
+        wThen = mh[0].weight;
+        wThenAgo = Math.floor((today.getTime() - new Date(mh[0].date).getTime()) / 86400000);
+        wThenFallback = true;
+      }
     }
     const goalW = this.state.goalWeight || 0;
     // 三态判定：优先看力量，无力量数据时退化为容量
@@ -2511,8 +2533,12 @@ Page({
       else hint = '平均强度偏低（' + rpeAvg.toFixed(1) + '），还有余量，可以再加点重量或组数。';
       rpe = { has: true, last: rpeList[rpeList.length - 1], avg: rpeAvg, count: rpeList.length, trend: trend, trendTxt: trendTxt, hint: hint };
       // 恢复压力参与结论：平台期 + RPE 持续偏高 → 按「需要减量」给建议（不改状态色）
-      if (status === 'plateau' && rpeAvg >= 8.5) advice = hint + '当前力量没涨且自感强度高，先减量一周再回到原计划。';
-      else if (advice) advice = advice + (rpeList.length >= 3 ? ' ' + hint : '');
+      // 改为 join 而不是替换：保留 deload/部位不均的诊断信息
+      if (status === 'plateau' && rpeAvg >= 8.5) {
+        advice = (advice ? advice + ' ' : '') + '当前力量没涨且自感强度高（RPE ' + rpeAvg.toFixed(1) + '），先减量一周再回到原计划。';
+      } else if (advice && rpeList.length >= 3) {
+        advice = advice + ' ' + hint;
+      }
     }
     // 计划执行：本周实际训练天数 / 一个完整循环的天数（days.length 即一个循环的动作日数）
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
@@ -2545,11 +2571,8 @@ Page({
     }
     prs.sort((a, b) => b.e1RM - a.e1RM);
     const prItems = prs.slice(0, 4);
-    // 连续训练天数：从今天往前数连续 trained 的天数（今天没练则从昨天起算）
-    let streak = 0;
-    const sd0 = new Date(today);
-    if (!(this.state.history[dstr(sd0)] && this.state.history[dstr(sd0)].trained)) sd0.setDate(sd0.getDate() - 1);
-    while (this.state.history[dstr(sd0)] && this.state.history[dstr(sd0)].trained) { streak++; sd0.setDate(sd0.getDate() - 1); }
+    // 连续训练天数：与主页面板共用 calcStreak() 保证一致
+    const streak = this.calcStreak();
     const trainedToday = !!(this.state.history[dstr(today)] && this.state.history[dstr(today)].trained);
     const streakInfo = { days: streak, trainedToday: trainedToday };
     const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k kg' : Math.round(v) + ' kg';
@@ -2568,9 +2591,12 @@ Page({
         streak: streakInfo,
         rpe: rpe,
         body: {
-          now: wNow,
-          delta: (wNow != null && wThen != null) ? Math.round((wNow - wThen) * 10) / 10 : null,
-          goalGap: (wNow != null && goalW) ? Math.round((wNow - goalW) * 10) / 10 : null
+          now: (wNow != null && isFinite(Number(wNow))) ? Math.round(Number(wNow) * 10) / 10 : null,
+          delta: (wNow != null && wThen != null) ? Math.round((Number(wNow) - Number(wThen)) * 10) / 10 : null,
+          // 对照样本是 30 天前的就显示"30 天"（接近即用），否则显示真实距今天数（避免标注 30 天误导）
+          agoText: (wNow != null && wThen != null) ? (wThenAgo + ' 天') : '',
+          fallback: wThenFallback,
+          goalGap: (wNow != null && goalW) ? Math.round((Number(wNow) - goalW) * 10) / 10 : null
         }
       }
     });

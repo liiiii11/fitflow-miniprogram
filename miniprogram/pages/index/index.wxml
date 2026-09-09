@@ -484,7 +484,7 @@
         <text class="rpt-sec__t">身体成分</text>
         <view class="rpt-line">
           <text class="rpt-line__k">当前体重</text>
-          <text class="rpt-line__v">{{report.body.now}} kg<block wx:if="{{report.body.delta}}"> · 30 天 {{report.body.delta}} kg</block></text>
+          <text class="rpt-line__v">{{report.body.now}} kg<block wx:if="{{report.body.delta}}"> · {{report.body.agoText}} {{report.body.delta}} kg</block></text>
         </view>
         <view wx:if="{{report.body.goalGap}}" class="rpt-line">
           <text class="rpt-line__k">距目标</text>
