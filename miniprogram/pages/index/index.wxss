@@ -51,6 +51,16 @@
 .col__add:active { color: var(--text); }
 .col__list { padding-bottom: 6px; } /* 完整展开，不再内部滚动 */
 
+/* 今日自感强度 RPE：1 很轻松 → 10 完全力竭 */
+.rpe { padding: 8px 0 10px; border-top: 1px solid var(--rule); margin-top: 4px; }
+.rpe__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.rpe__t { font-size: 10px; color: var(--muted); }
+.rpe__cur { font-size: 11px; font-weight: 600; color: var(--accent); }
+.rpe__chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.rpe-chip { width: 20px; height: 20px; line-height: 20px; text-align: center; font-size: 11px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); }
+.rpe-chip.on { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.rpe__hint { display: block; font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
 /* ============ ITEM ============ */
 .item { display: flex; align-items: center; gap: 8px; padding: 7px 0; position: relative; }
 .item__name { font-size: 15px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

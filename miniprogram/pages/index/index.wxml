@@ -63,6 +63,17 @@
             <view class="item__check {{item.done?'done':''}}" catchtap="toggleEx" data-i="{{item.i}}"></view>
           </view>
         </view>
+        <!-- 今日自感强度 RPE：1 很轻松 → 10 完全力竭 -->
+        <view class="rpe">
+          <view class="rpe__head">
+            <text class="rpe__t">今日强度 RPE</text>
+            <text wx:if="{{rpeVal}}" class="rpe__cur">{{rpeVal}} · {{rpeText}}</text>
+          </view>
+          <view class="rpe__chips">
+            <view wx:for="{{rpeChips}}" wx:key="*this" class="rpe-chip {{rpeVal===item?'on':''}}" bindtap="setRpe" data-v="{{item}}">{{item}}</view>
+          </view>
+          <text class="rpe__hint">{{rpeHint}}</text>
+        </view>
       </view>
       <!-- 有氧 -->
       <view class="col__block" style="border-top:1px solid var(--rule)">
@@ -213,6 +224,17 @@
         <view wx:if="{{report.body.goalGap}}" class="rpt-line">
           <text class="rpt-line__k">距目标</text>
           <text class="rpt-line__v">{{report.body.goalGap}} kg</text>
+        </view>
+      </view>
+      <view wx:if="{{report.rpe.has}}" class="rpt-sec">
+        <text class="rpt-sec__t">自感强度 RPE（近 28 天 {{report.rpe.count}} 次）</text>
+        <view class="rpt-line">
+          <text class="rpt-line__k">最近一次</text>
+          <text class="rpt-line__v">{{report.rpe.last}} / 10</text>
+        </view>
+        <view class="rpt-line">
+          <text class="rpt-line__k">平均值</text>
+          <text class="rpt-line__v">{{report.rpe.avg}} <text class="rpt-delta">{{report.rpe.trendTxt}}</text></text>
         </view>
       </view>
       <view class="rpt-advice">{{report.advice}}</view>

@@ -138,6 +138,8 @@ Page({
     dayEditorTitle: '', dayExName: '', dayExList: [],
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [],
     growthBars: [], report: { hasData: false },
+    // 今日自感强度 RPE（1~10，写入 history[今天].rpe）
+    rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '', rpeHint: '',
     weekTrain: '0/7', monthTrain: '0 天', streakDays: '0 天', totalTrain: '0 天',
     aiStatus: 'AI 查询',
     // 打赏（虚拟支付·道具直购）：档位 productId/价格须与后台「道具管理」、云函数 payService 的 TIERS 三处严格一致；iOS 已开通苹果 IAP，双端显示
@@ -574,6 +576,37 @@ Page({
       planTitle, planLabel, dayLocked, exList: this.buildExView(),
       exDragIdx: dragging ? this.data.exDragIdx : -1,
       exDragY: dragging ? this.data.exDragY : 0
+    });
+    this.renderRpe();
+  },
+  // ==================== 今日自感强度 RPE ====================
+  // 1~2 很轻松 / 3~4 轻松 / 5~6 有点吃力 / 7~8 吃力 / 9~10 接近或到达力竭
+  rpeWord(v) {
+    if (v <= 2) return '很轻松';
+    if (v <= 4) return '轻松';
+    if (v <= 6) return '有点吃力';
+    if (v <= 8) return '吃力';
+    return '接近力竭';
+  },
+  setRpe(e) {
+    const v = parseInt(e.currentTarget.dataset.v, 10);
+    if (!(v >= 1 && v <= 10)) return;
+    const today = todayKey();
+    if (!this.state.history[today]) this.recordTodayToHistory();
+    const h = this.state.history[today];
+    if (!h) return;
+    h.rpe = v;
+    this.saveState();
+    this.renderRpe();
+    this.toast('已记录 RPE ' + v + ' · ' + this.rpeWord(v));
+  },
+  renderRpe() {
+    const h = this.state.history[todayKey()];
+    const v = (h && h.rpe) ? h.rpe : 0;
+    this.setData({
+      rpeVal: v,
+      rpeText: v ? this.rpeWord(v) : '',
+      rpeHint: v ? '同一个重量下 RPE 变低，说明你变强了。' : '训练后点一下：1 很轻松，10 完全力竭。'
     });
   },
   // 动作稳定 key：跨排序不变。否则提交排序后节点原地换内容，done(对勾)状态在
@@ -2085,6 +2118,7 @@ Page({
       body.push({ label: '消耗', text: (h.burn || 0) + ' kcal' });
       body.push({ label: '摄入', text: (h.intake || 0) + ' kcal' });
       body.push({ label: '饮水', text: (h.water || 0) + ' ml' });
+      if (h.rpe) body.push({ label: '自感强度 RPE', text: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
       body.push({ label: '完成动作 (' + ((h.exNames || []).length) + ')', text: '', head: true });
       const exNames = h.exNames || [];
       const exMetas = h.exMeta || [];
@@ -2310,8 +2344,37 @@ Page({
       statusText = '平台期';
       advice = '变化不明显：换 1~2 个动作变式，或调整组次（如 4×8 → 5×5），同时确认热量和蛋白质够。';
     }
+    // 自感强度 RPE：近 28 天记录。RPE 是「同一个重量练起来更轻松了吗」的直接证据，
+    // 力量没涨但 RPE 在降 = 体能恢复变好；RPE 持续偏高 = 恢复不足，需减量。
+    const since28 = new Date(today); since28.setDate(today.getDate() - 28);
+    const rpeList = [];
+    Object.keys(this.state.history || {}).sort().forEach(d => {
+      const h = this.state.history[d];
+      if (h && h.rpe && new Date(d).getTime() >= since28.getTime()) rpeList.push(h.rpe);
+    });
+    let rpe = { has: false, last: 0, avg: 0, count: 0, trend: 0, trendTxt: '—', hint: '' };
+    if (rpeList.length) {
+      const avg = rpeList.reduce((s, x) => s + x, 0) / rpeList.length;
+      const rpeAvg = Math.round(avg * 10) / 10;
+      let trend = 0, trendTxt = '—';
+      if (rpeList.length >= 4) {
+        const mid = Math.floor(rpeList.length / 2);
+        const a1 = rpeList.slice(0, mid).reduce((s, x) => s + x, 0) / mid;
+        const a2 = rpeList.slice(mid).reduce((s, x) => s + x, 0) / (rpeList.length - mid);
+        trend = Math.round((a2 - a1) * 10) / 10;
+        trendTxt = (trend >= 0 ? '+' : '') + trend.toFixed(1);
+      }
+      let hint = '';
+      if (rpeAvg >= 8.5) hint = '平均强度偏高（' + rpeAvg.toFixed(1) + '），恢复压力大，建议安排一个减量周。';
+      else if (rpeAvg >= 6.5) hint = '强度适中（' + rpeAvg.toFixed(1) + '），是长期进步最舒服的区间。';
+      else hint = '平均强度偏低（' + rpeAvg.toFixed(1) + '），还有余量，可以再加点重量或组数。';
+      rpe = { has: true, last: rpeList[rpeList.length - 1], avg: rpeAvg, count: rpeList.length, trend: trend, trendTxt: trendTxt, hint: hint };
+      // 恢复压力参与结论：平台期 + RPE 持续偏高 → 按「需要减量」给建议（不改状态色）
+      if (status === 'plateau' && rpeAvg >= 8.5) advice = hint + '当前力量没涨且自感强度高，先减量一周再回到原计划。';
+      else if (advice) advice = advice + (rpeList.length >= 3 ? ' ' + hint : '');
+    }
     const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
-    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0;
+    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0;
     this.setData({
       report: {
         hasData: hasData,
@@ -2319,6 +2382,7 @@ Page({
         strength: { items: strengthTop, count: strength.length },
         volume: { text: fmtVol(v7), pctTxt: vPrev7 > 0 ? (volPct >= 0 ? '+' : '') + volPct.toFixed(0) + '%' : '—', up: volPct > 0 },
         consistency: { recent: recent4.toFixed(1), diff: (recent4 - prev4).toFixed(1), up: recent4 - prev4 >= 0 },
+        rpe: rpe,
         body: {
           now: wNow,
           delta: (wNow != null && wThen != null) ? Math.round((wNow - wThen) * 10) / 10 : null,
