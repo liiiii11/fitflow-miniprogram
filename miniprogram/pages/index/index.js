@@ -2122,10 +2122,19 @@ Page({
       const isFuture = isCurrentMonth && day > today;
       cells.push({ day: String(day), level: level, color: colors[level], isToday, isFuture, disabled: isFuture, dateStr });
     }
+    // 进度页「本月训练」固定表示今天所在自然月，不受翻看历史月热力图影响（否则标签与数值错位）
+    const curY = now.getFullYear(), curM = now.getMonth();
+    const curDays = new Date(curY, curM + 1, 0).getDate();
+    let curMonthTrained = 0;
+    for (let d = 1; d <= curDays; d++) {
+      const ds = curY + '-' + ('0' + (curM + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+      const hh = this.state.history[ds];
+      if (hh && hh.trained) curMonthTrained++;
+    }
     this.setData({
       heatmapMonthLabel: MONTH_CN[month] + ' 训练热度',
       heatmapDaysLabel: trainedCount + '/' + daysInMonth + ' 天',
-      monthTrain: trainedCount + ' 天',
+      monthTrain: curMonthTrained + ' 天',
       heatmap: cells
     });
   },
@@ -2255,6 +2264,22 @@ Page({
     const s = String(meta || '');
     const wm = /(\d+(?:\.\d+)?)\s*kg/.exec(s);
     if (!wm) return null;
+    // 递增方案 "60kg*12→70kg*10→80kg*8"：取各段，代表重量用末段(最高重量)，
+    // 组数=段数，容量=各段重量×次数之和；与消耗侧 parseProgSets 口径一致
+    if (s.indexOf('→') >= 0) {
+      const prog = this.parseProgSets(meta);
+      if (prog.length >= 2) {
+        const last = prog[prog.length - 1];
+        const topReps = last.reps || 0;
+        const e1 = topReps > 1 ? last.kg * (1 + topReps / 30) : last.kg;
+        const totalVol = prog.reduce((a, g) => a + (isFinite(g.kg) && isFinite(g.reps) ? g.kg * g.reps : 0), 0);
+        return {
+          weight: last.kg, sets: prog.length,
+          reps: prog.reduce((a, g) => a + (g.reps || 0), 0), topReps: topReps,
+          e1RM: Math.round(e1 * 10) / 10, volume: Math.round(totalVol)
+        };
+      }
+    }
     const weight = parseFloat(wm[1]);
     let sets = 0, totalReps = 0, topReps = 0;
     const sm = /(\d+)\s*组\s*\*\s*([\d+]+)/.exec(s);
@@ -2268,9 +2293,11 @@ Page({
     } else {
       const so = /(\d+)\s*组/.exec(s);
       if (so) sets = parseInt(so[1], 10) || 0;
-      const ro = /\*\s*([\d+]+)/.exec(s);
-      if (ro) {
-        const parts = ro[1].split('+');
+      // 兼容旧格式用 × 分隔（如 "80kg×4组×12"）：次数取最后一段 ×N（倒数第一个 N 即次数，组数已由上「N组」取走）
+      const roAll = s.match(/[×*]\s*(\d+)/g);
+      if (roAll && roAll.length) {
+        const last = roAll[roAll.length - 1].replace(/[×*]/, '').trim();
+        const parts = last.split('+');
         topReps = parseInt(parts[0], 10) || 0;
         totalReps = parts.reduce((a, x) => a + (parseInt(x, 10) || 0), 0);
       }
@@ -2515,7 +2542,7 @@ Page({
     while (this.state.history[dstr(sd0)] && this.state.history[dstr(sd0)].trained) { streak++; sd0.setDate(sd0.getDate() - 1); }
     const trainedToday = !!(this.state.history[dstr(today)] && this.state.history[dstr(today)].trained);
     const streakInfo = { days: streak, trainedToday: trainedToday };
-    const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
+    const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k kg' : Math.round(v) + ' kg';
     const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0;
     this.setData({
       report: {
