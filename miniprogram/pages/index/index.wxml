@@ -483,14 +483,6 @@
           <text class="rpt-line__v rpt-line__v--{{item.level}}">{{item.sets}} 组 · {{item.state}}</text>
         </view>
       </view>
-      <view wx:if="{{report.variety.count}}" class="rpt-sec">
-        <text class="rpt-sec__t">动作多样性</text>
-        <view class="rpt-line">
-          <text class="rpt-line__k">近 7 天不同动作</text>
-          <text class="rpt-line__v rpt-line__v--{{report.variety.state}}">{{report.variety.count}} 个 · {{report.variety.stateTxt}}</text>
-        </view>
-        <view wx:if="{{report.variety.hint}}" class="rpt-advice" style="margin-top:6px">{{report.variety.hint}}</view>
-      </view>
       <view wx:if="{{report.body.now}}" class="rpt-sec">
         <text class="rpt-sec__t">身体成分</text>
         <view class="rpt-line">

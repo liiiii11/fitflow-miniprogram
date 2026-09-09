@@ -2492,21 +2492,6 @@ Page({
     }
     prs.sort((a, b) => b.e1RM - a.e1RM);
     const prItems = prs.slice(0, 4);
-    // 动作多样性：近 7 天不同动作数（防动作单一导致进步停滞）
-    const seenEx = {};
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today); d.setDate(today.getDate() - i);
-      const h = this.state.history[dstr(d)];
-      if (!h || !h.trained) continue;
-      (h.exNames || []).forEach(n => { const k = String(n || '').trim(); if (k) seenEx[k] = 1; });
-    }
-    const varietyCount = Object.keys(seenEx).length;
-    const variety = { count: varietyCount, state: '', stateTxt: '', hint: '' };
-    if (varietyCount > 0) {
-      if (varietyCount < 4) { variety.state = 'low'; variety.stateTxt = '偏单一'; variety.hint = '动作偏单一，建议每 1~2 周换 1~2 个动作变式以保持刺激。'; }
-      else if (varietyCount > 12) { variety.state = 'high'; variety.stateTxt = '偏杂'; variety.hint = '动作较多，核心动作保持稳定才能积累渐进超负荷。'; }
-      else { variety.state = 'ok'; variety.stateTxt = '合适'; }
-    }
     // 连续训练天数：从今天往前数连续 trained 的天数（今天没练则从昨天起算）
     let streak = 0;
     const sd0 = new Date(today);
@@ -2515,7 +2500,7 @@ Page({
     const trainedToday = !!(this.state.history[dstr(today)] && this.state.history[dstr(today)].trained);
     const streakInfo = { days: streak, trainedToday: trainedToday };
     const fmtVol = v => v >= 1000 ? (v / 1000).toFixed(1) + ' 吨' : Math.round(v) + ' kg';
-    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0 || varietyCount > 0;
+    const hasData = strengthTop.length > 0 || v7 > 0 || recent4 > 0 || rpeList.length > 0 || muscles.length > 0;
     this.setData({
       report: {
         hasData: hasData,
@@ -2527,7 +2512,6 @@ Page({
         deload: deload,
         completion: completion,
         prs: { items: prItems, count: prs.length },
-        variety: variety,
         streak: streakInfo,
         rpe: rpe,
         body: {
