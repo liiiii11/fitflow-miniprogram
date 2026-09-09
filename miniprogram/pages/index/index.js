@@ -816,9 +816,12 @@ Page({
 
   // ==================== GOAL ====================
   getRecommendedCals() {
-    const cur = (this.state.metrics.current && this.state.metrics.current.weight)
+    const raw = (this.state.metrics.current && this.state.metrics.current.weight != null)
       ? this.state.metrics.current.weight : this.state.goalWeight;
-    const target = this.state.goalWeight;
+    const cur = Number(raw);
+    const target = Number(this.state.goalWeight);
+    // 旧数据可能把体重/目标存成非数字，直接乘会得 NaN 污染摄入进度；无有效数据给基础兜底
+    if (!isFinite(cur) || !isFinite(target)) return 1200;
     const diff = target - cur;
     let base = Math.round(cur * 28);
     if (diff < -1) base -= 400;
@@ -1549,17 +1552,20 @@ Page({
     let weightVal = '--', bodyFatVal = '--', weightDiff = '', bodyFatDiff = '', mWeight = '', mBodyFat = '';
     if (cur) {
       const prev = this.state.metrics.previous || cur;
-      // storage 旧数据可能把数字存成字符串，.toFixed 会直接抛错崩溃；统一 Number 保护
-      const w = Number(cur.weight), b = Number(cur.bodyFat);
-      const pw = Number(prev.weight), pb = Number(prev.bodyFat);
+      // bodyFat 可能为选填 null（只记体重），统一按 null/非数字判定：避免 null→0 被显示成 '0.0'
+      const w = (cur.weight != null && isFinite(Number(cur.weight))) ? Number(cur.weight) : NaN;
+      const b = (cur.bodyFat != null && isFinite(Number(cur.bodyFat))) ? Number(cur.bodyFat) : NaN;
+      const pw = (prev.weight != null && isFinite(Number(prev.weight))) ? Number(prev.weight) : NaN;
+      const pb = (prev.bodyFat != null && isFinite(Number(prev.bodyFat))) ? Number(prev.bodyFat) : NaN;
       weightVal = isFinite(w) ? w.toFixed(1) : '--';
       bodyFatVal = isFinite(b) ? b.toFixed(1) : '--';
       const wd = isFinite(w) && isFinite(pw) ? w - pw : 0;
       const bd = isFinite(b) && isFinite(pb) ? b - pb : 0;
       weightDiff = (wd > 0 ? '+' : '') + wd.toFixed(1);
       bodyFatDiff = (bd > 0 ? '+' : '') + bd.toFixed(1);
-      mWeight = w;
-      mBodyFat = b;
+      // 回填输入框：bodyFat 为 null 时留空，而非显示 0
+      mWeight = isFinite(w) ? w : '';
+      mBodyFat = isFinite(b) ? b : '';
     }
     this.setData({ weightVal, bodyFatVal, weightDiff, bodyFatDiff, mWeight, mBodyFat });
     this.updateGoalWeightHint();
@@ -1569,21 +1575,23 @@ Page({
   onMBodyFat(e) { this.setData({ mBodyFat: e.detail.value }); },
   saveMetric() {
     const w = parseFloat(this.data.mWeight);
+    if (isNaN(w)) { this.toast('请输入有效体重'); return; }
+    // 体脂为选填项：未填写不拦截保存，存为 null（renderMetrics / metricSeries 已对 null 做保护，显示 '--' 且不入曲线）
     const b = parseFloat(this.data.mBodyFat);
-    if (isNaN(w) || isNaN(b)) { this.toast('请输入有效数值'); return; }
+    const bf = isFinite(b) ? b : null;
     if (!this.state.metrics || !this.state.metrics.current) {
-      this.state.metrics = { current: { weight: w, bodyFat: b }, previous: null, initial: { weight: w, bodyFat: b }, history: [] };
+      this.state.metrics = { current: { weight: w, bodyFat: bf }, previous: null, initial: { weight: w, bodyFat: bf }, history: [] };
     } else {
       this.state.metrics.previous = JSON.parse(JSON.stringify(this.state.metrics.current));
-      this.state.metrics.current = { weight: w, bodyFat: b };
+      this.state.metrics.current = { weight: w, bodyFat: bf };
     }
     if (!Array.isArray(this.state.metrics.history)) this.state.metrics.history = [];
     const today = todayKey();
     const lastLog = this.state.metrics.history[this.state.metrics.history.length - 1];
     if (lastLog && lastLog.date === today) {
-      lastLog.weight = w; lastLog.bodyFat = b;
+      lastLog.weight = w; lastLog.bodyFat = bf;
     } else {
-      this.state.metrics.history.push({ date: today, weight: w, bodyFat: b });
+      this.state.metrics.history.push({ date: today, weight: w, bodyFat: bf });
     }
     this.saveState();
     this.renderMetrics();
@@ -1604,7 +1612,7 @@ Page({
   },
   metricSeries(field) {
     const arr = ((this.state.metrics && this.state.metrics.history) || [])
-      .filter(r => r && r.date && isFinite(r[field]))
+      .filter(r => r && r.date && r[field] != null && isFinite(r[field]))
       .sort((a, b) => (a.date < b.date ? -1 : 1));
     return arr.map(r => ({ y: +r[field], date: r.date }));
   },
@@ -2278,7 +2286,7 @@ Page({
     if (p && p.sets) return p.sets;
     const m = /(\d+)\s*组/.exec(String(meta || ''));
     if (m) return parseInt(m[1], 10) || 1;
-    return 1;
+    return 4; // 与 parseSets 对齐：无组数但含重量/次数的写法（如「60kg*12」）默认 4 组，保证部位组数与容量口径一致；建议录入带组数
   },
   // 按动作名收集历史记录（日期升序）
   collectExSeries() {
