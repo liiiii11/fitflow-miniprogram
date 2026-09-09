@@ -91,8 +91,15 @@ function loadState() {
       if (s.metrics && !Array.isArray(s.metrics.history)) s.metrics.history = [];
       if (!Array.isArray(s.plans) || s.plans.length === 0) s.plans = JSON.parse(JSON.stringify(DEFAULT_PLANS));
       if (!Array.isArray(s.customPlans)) s.customPlans = [];
-      if (!s.meals || !s.meals.breakfast || !s.meals.breakfast.items) {
+      if (!s.meals || typeof s.meals !== 'object') {
         s.meals = { breakfast: { name: '早餐', items: [] }, lunch: { name: '午餐', items: [] }, dinner: { name: '晚餐', items: [] }, snack: { name: '加餐', items: [] } };
+      } else {
+        // 归一化每个餐次：缺失或非数组 .items 的，补成标准结构，避免启动 getTotalIntake 访问 meals[x].items 白屏
+        Object.keys(MEAL_LABELS).forEach(t => {
+          if (!s.meals[t] || !Array.isArray(s.meals[t].items)) {
+            s.meals[t] = { name: MEAL_LABELS[t], items: [] };
+          }
+        });
       }
       if (!s.currentPlanId) s.currentPlanId = 'ppl';
       if (typeof s.currentDayIdx !== 'number' || s.currentDayIdx < 0) s.currentDayIdx = 0;
@@ -788,7 +795,10 @@ Page({
     return (items || []).reduce((s, i) => s + (isFinite(i.cal) ? i.cal : 0), 0);
   },
   getTotalIntake() {
-    return Object.keys(this.state.meals).reduce((s, t) => s + this.getTotalMealCals(this.state.meals[t].items), 0);
+    return Object.keys(this.state.meals || {}).reduce((s, t) => {
+      const m = this.state.meals[t];
+      return s + this.getTotalMealCals(m && m.items ? m.items : null);
+    }, 0);
   },
   updateIntake() {
     const total = this.getTotalIntake();
