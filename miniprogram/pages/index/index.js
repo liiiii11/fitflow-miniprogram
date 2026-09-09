@@ -2295,7 +2295,7 @@ Page({
         const key = String(names[j] || '').trim();
         if (!key) continue;
         if (!byName[key]) byName[key] = [];
-        byName[key].push({ date: dates[i], weight: p.weight, e1RM: p.e1RM, volume: p.volume, reps: p.topReps });
+        byName[key].push({ date: dates[i], weight: p.weight, e1RM: p.e1RM, volume: p.volume });
       }
     }
     return byName;
@@ -2348,12 +2348,7 @@ Page({
         from = pts[0].e1RM; to = pts[1].e1RM;
         pct = (pts[0].e1RM > 0 && span >= 14) ? (to - from) / from / span * 28 * 100 : 0;
       }
-      // 力量行同时带上「最近一次实际重量×次数」「上次估算1RM」「本次估算1RM」，避免把 e1RM 误当成举的重量、也不丢上次对比
-      const lastPt = pts[pts.length - 1];
-      const prevPt = pts[pts.length - 2];
-      const lastReps = lastPt.reps || 0;
-      const actualTxt = lastReps >= 1 ? (lastPt.weight + 'kg×' + lastReps) : (lastPt.weight + 'kg');
-      strength.push({ name: names[i], from: from, to: to, n: pts.length, pct: Math.round(pct * 10) / 10, pctTxt: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct > 0, actualTxt: actualTxt, prevE1RM: prevPt.e1RM, lastE1RM: lastPt.e1RM, lastWeight: lastPt.weight, lastReps: lastReps });
+      strength.push({ name: names[i], from: from, to: to, n: pts.length, pct: Math.round(pct * 10) / 10, pctTxt: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct > 0 });
     }
     strength.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
     const strengthTop = strength.slice(0, 3);

@@ -459,9 +459,10 @@
       </view>
       <view wx:if="{{report.strength.items.length}}" class="rpt-sec">
         <text class="rpt-sec__t">力量（e1RM 变化）</text>
+        <text class="rpt-sec__f">e1RM = 重量 ×(1+次数/30)，即按次数估算的单次最大重量</text>
         <view wx:for="{{report.strength.items}}" wx:key="name" class="rpt-line">
           <text class="rpt-line__k">{{item.name}}</text>
-          <text class="rpt-line__v">实际 {{item.actualTxt}} · 估算1RM 上次{{item.prevE1RM}}→本次{{item.lastE1RM}}kg <text class="rpt-delta">{{item.pctTxt}}</text></text>
+          <text class="rpt-line__v">{{item.from}} → {{item.to}} kg · {{item.pctTxt}}</text>
         </view>
       </view>
       <view wx:if="{{report.prs.items.length}}" class="rpt-sec">

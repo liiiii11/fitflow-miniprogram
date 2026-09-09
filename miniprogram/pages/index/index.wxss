@@ -233,6 +233,7 @@
 .rpt-delta { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 4px; }
 .rpt-sec { margin-bottom: 12px; }
 .rpt-sec__t { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.rpt-sec__f { display: block; font-size: 10px; color: var(--muted); margin: -4px 0 8px; opacity: .85; }
 .rpt-line { display: flex; align-items: baseline; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--rule); }
 .rpt-line:last-child { border-bottom: none; }
 .rpt-line__k { color: var(--text); }
