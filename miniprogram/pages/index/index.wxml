@@ -461,7 +461,7 @@
         <text class="rpt-sec__t">力量（e1RM 变化）</text>
         <view wx:for="{{report.strength.items}}" wx:key="name" class="rpt-line">
           <text class="rpt-line__k">{{item.name}}</text>
-          <text class="rpt-line__v">{{item.from}} → {{item.to}} kg · {{item.pctTxt}}</text>
+          <text class="rpt-line__v">实际 {{item.actualTxt}} → 估算1RM {{item.lastE1RM}}kg <text class="rpt-delta">{{item.pctTxt}}</text></text>
         </view>
       </view>
       <view wx:if="{{report.prs.items.length}}" class="rpt-sec">
