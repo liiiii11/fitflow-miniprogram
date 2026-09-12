@@ -1854,6 +1854,26 @@ Page({
     this.renderEditorDays();
     this.toast('已添加训练日: ' + name);
   },
+  renameEditorDay(e) {
+    const idx = e.currentTarget.dataset.i;
+    const cur = this._editorDays[idx];
+    if (!cur) return;
+    wx.showModal({
+      title: '修改训练日名称',
+      content: '',
+      editable: true,
+      placeholderText: '请输入新名称',
+      success: r => {
+        if (!r.confirm) return;
+        const name = String(r.content || '').trim();
+        if (!name) { this.toast('名称不能为空'); return; }
+        if (name === cur.name) return;
+        cur.name = name;
+        this.renderEditorDays();
+        this.toast('已修改为: ' + name);
+      }
+    });
+  },
   removeEditorDay(e) {
     const idx = e.currentTarget.dataset.i;
     this._editorDays.splice(idx, 1);

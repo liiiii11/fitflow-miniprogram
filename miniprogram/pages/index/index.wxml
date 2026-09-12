@@ -273,7 +273,7 @@
   <view wx:if="{{planDaysView.length===0}}" style="padding:16px 0;text-align:center;color:var(--muted);font-size:12px">暂无训练日，在下方输入名称添加</view>
   <view wx:for="{{planDaysView}}" wx:key="i" style="padding:12px 0;border-bottom:1px solid var(--rule)">
     <view style="display:flex;align-items:center;justify-content:space-between">
-      <text style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</text>
+      <text style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="renameEditorDay" data-i="{{item.i}}">{{item.name}}</text>
       <view style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:10px">
         <text style="font-size:12px;color:var(--muted)">{{item.count}} 个动作</text>
         <text style="font-size:12px;color:var(--text);font-weight:500" bindtap="openDayEditor" data-i="{{item.i}}">编辑动作</text>
