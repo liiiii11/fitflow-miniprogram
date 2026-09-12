@@ -149,7 +149,7 @@
       <view wx:for="{{heatmap}}" wx:key="index"
         class="heat-cell {{item.isToday?'today':''}} {{item.disabled?'disabled':''}}"
         style="background:{{item.color}}"
-        bindtap="showHeatDetail" data-ds="{{item.dateStr}}">{{item.day}}</view>
+        bindtap="openEditDay" data-ds="{{item.dateStr}}">{{item.day}}</view>
     </view>
     <view class="heat-legend">
       <text style="margin-right:auto">当月对比</text>
@@ -588,22 +588,44 @@
   </view>
 </view>
 
-<!-- 热度详情 -->
+<!-- 热度详情 / 补录某日 -->
 <view wx:if="{{modalOverlay==='heatDetail'}}" class="ov-mask {{ovClosing?'ov-out':''}}" bindtap="closeOverlay">
   <view class="ov-sheet {{ovClosing?'ov-out':''}}" catchtap>
     <view class="sheet__title">{{heatDetailTitle}}</view>
-    <view style="font-size:14px;line-height:1.7;color:var(--text);padding:4px 0">
+    <view style="font-size:14px;line-height:1.7;color:var(--text);padding:4px 0 8px">
       <view wx:for="{{heatDetailBody}}" wx:key="index" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule)">
-        <text wx:if="{{item.head}}" style="color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;flex:1">{{item.label}}</text>
-        <block wx:else>
-          <text wx:if="{{item.ex}}" style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
-          <text wx:if="{{item.label && !item.ex}}" style="color:var(--muted)">{{item.label}}</text>
-          <text style="{{item.muted?'color:var(--muted);margin-left:auto':''}} {{item.ex?'margin-left:8px':''}}">{{item.text}}</text>
-        </block>
+        <text style="color:var(--muted)">{{item.k}}</text>
+        <text style="margin-left:auto">{{item.v}}</text>
       </view>
     </view>
-    <view style="display:flex;gap:12px;margin-top:20px">
-      <button class="btn btn--pri btn--fw" style="flex:1" bindtap="closeOverlay">关闭</button>
+    <view style="display:flex;align-items:baseline;justify-content:space-between;margin:14px 0 8px">
+      <text style="color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em">完成动作 ({{editExList.length}})</text>
+      <text wx:if="{{editDate}}" style="font-size:10px;color:var(--muted)">点名称可改、点 ✎ 改方案、点 ✕ 删</text>
+    </view>
+    <view wx:if="{{editExList.length === 0}}" style="font-size:13px;color:var(--muted);padding:10px 0">这一天还没有动作记录，可在下方添加。</view>
+    <view wx:for="{{editExList}}" wx:key="i" class="edit-day-row">
+      <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <text style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
+        <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="changeEditExMeta" data-i="{{item.i}}">{{item.name}}</text>
+        <text wx:if="{{item.meta}}" style="font-size:12px;color:var(--muted);flex-shrink:0;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· {{item.meta}}</text>
+      </view>
+      <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
+        <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditExMeta" data-i="{{item.i}}">改</text>
+        <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditEx" data-i="{{item.i}}">删</text>
+      </view>
+    </view>
+    <!-- 添加新动作 -->
+    <view style="margin-top:18px;padding-top:14px;border-top:1px solid var(--rule)">
+      <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加动作</text>
+      <view style="display:flex;flex-direction:column;gap:8px">
+        <input class="fg__inp" placeholder="动作名称（如：卧推）" value="{{editExName}}" bindinput="onEditExName" style="font-size:15px" cursor-spacing="100"/>
+        <input class="fg__inp" placeholder="重量方案（选填，如：60kg 4组*10）" value="{{editExMeta}}" bindinput="onEditExMeta" style="font-size:15px" cursor-spacing="100"/>
+        <button class="btn btn--pri btn--fw" bindtap="addEditEx">添加</button>
+      </view>
+    </view>
+    <view style="display:flex;gap:12px;margin-top:18px">
+      <button class="btn btn--ghost" style="flex:1" bindtap="clearEditDay">清空当天</button>
+      <button class="btn btn--pri btn--fw" style="flex:2" bindtap="closeOverlay">关闭</button>
     </view>
   </view>
 </view>

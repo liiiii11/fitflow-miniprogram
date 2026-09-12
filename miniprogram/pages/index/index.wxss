@@ -213,6 +213,7 @@
 .heat-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); border-radius: 3px; }
 .heat-cell.today { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .heat-cell.disabled { opacity: .3; }
+.edit-day-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
 .heat-sq { width: 10px; height: 10px; border-radius: 2px; }
 .heat-legend { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 10px; color: var(--muted); }
 

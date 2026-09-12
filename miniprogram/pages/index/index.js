@@ -161,6 +161,8 @@ Page({
     planEditorTitle: '新建计划', planName: '', newDayName: '', planDaysView: [],
     dayEditorTitle: '', dayExName: '', dayExList: [],
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [], heatPalette: HEAT_PALETTE,
+    // 进度页热力图点击补录：当前正在补录/查看的日期，点击 heatmap 格子触发 openEditDay 设置
+    editDate: '', editExName: '', editExMeta: '', editExList: [], editDaySummary: [],
     growthBars: [], report: { hasData: false },
     // 今日自感强度 RPE（1~10，写入 history[今天].rpe）
     rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '',
@@ -2202,36 +2204,154 @@ Page({
       heatmap: cells
     });
   },
-  showHeatDetail(e) {
+  openEditDay(e) {
     const dateStr = e.currentTarget.dataset.ds;
     if (!dateStr) return;
-    // 未来日期格子（当月今天之后的占位）不可查看：直接忽略，避免弹出误导性的「休息日」
+    // 未来日期格子（当月今天之后的占位）不可编辑：直接忽略，避免弹出误导
     if (dateStr > todayKey()) return;
     const parts = dateStr.split('-');
     const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
     const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    const title = MONTH_CN[m] + d + '日 ' + dayNames[new Date(y, m, d).getDay()];
-    const h = this.state.history[dateStr];
-    let body = [];
-    if (!h || !h.trained) {
-      body.push({ label: '', text: '休息日，未训练', muted: true });
-    } else {
-      body.push({ label: '训练部位', text: h.dayName || '训练日' });
-      body.push({ label: '消耗', text: (h.burn || 0) + ' kcal' });
-      body.push({ label: '摄入', text: (h.intake || 0) + ' kcal' });
-      body.push({ label: '饮水', text: (h.water || 0) + ' ml' });
-      if (h.rpe) body.push({ label: '自感强度 RPE', text: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
-      body.push({ label: '完成动作 (' + ((h.exNames || []).length) + ')', text: '', head: true });
-      const exNames = h.exNames || [];
-      const exMetas = h.exMeta || [];
-      if (exNames.length > 0) {
-        exNames.forEach((n, i) => body.push({ label: '✓', text: n + (exMetas[i] ? ' · ' + exMetas[i] : ''), ex: true }));
-      } else {
-        body.push({ label: '', text: '（该日期未记录动作明细）', muted: true });
-      }
-    }
-    this.setData({ heatDetailTitle: title, heatDetailBody: body });
+    const isToday = dateStr === todayKey();
+    const agoDays = isToday ? 0 : Math.round((Date.now() - new Date(y, m, d).getTime()) / 86400000);
+    const title = MONTH_CN[m] + d + '日 ' + dayNames[new Date(y, m, d).getDay()] + (agoDays > 0 ? ' (距今 ' + agoDays + ' 天)' : ' · 今日');
+    const h = this.state.history[dateStr] || { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+    // 摘要行：日期 + 部位 + 消耗 + 摄入 + 饮水 + RPE（合并原有 showHeatDetail 详情）
+    const summary = [];
+    summary.push({ k: '训练部位', v: h.dayName || (h.trained ? '训练日' : '休息日') });
+    summary.push({ k: '消耗', v: (h.burn || 0) + ' kcal' });
+    summary.push({ k: '摄入', v: (h.intake || 0) + ' kcal' });
+    summary.push({ k: '饮水', v: (h.water || 0) + ' ml' });
+    if (h.rpe) summary.push({ k: '自感强度 RPE', v: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
+    const exNames = h.exNames || [];
+    const exMetas = h.exMeta || [];
+    // 动作明细编辑视图（每行：name + meta + 操作）
+    const exList = exNames.map((n, i) => ({ name: n, meta: exMetas[i] || '', i: i }));
+    this.setData({ editDate: dateStr, editDaySummary: summary, editExList: exList, editExName: '', editExMeta: '', heatDetailTitle: title, heatDetailBody: summary });
     this.openModal('heatDetail');
+  },
+  onEditExName(e) { this.setData({ editExName: e.detail.value }); },
+  onEditExMeta(e) { this.setData({ editExMeta: e.detail.value }); },
+  addEditEx() {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const name = (this.data.editExName || '').trim();
+    if (!name) { this.toast('请输入动作名称'); return; }
+    const meta = (this.data.editExMeta || '').trim();
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    if (!Array.isArray(h.exNames)) h.exNames = [];
+    if (!Array.isArray(h.exMeta)) h.exMeta = [];
+    // 名称校验：递增方案（包含→）或新格式含 '*' 的不强制要 meta（允许先填名再补 meta）
+    if (h.exNames.indexOf(name) >= 0) { this.toast('该动作已存在，可在原行点改/删'); return; }
+    h.exNames.push(name);
+    h.exMeta.push(meta);
+    h.trained = 1; // 添加动作即视为这一天训练过（与 recordTodayToHistory 行为一致）
+    this.recalcEditDayBurn(dateStr);
+    this.setData({ editExName: '', editExMeta: '' });
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+    this.toast('已添加: ' + name + (meta ? ' ' + meta : ''));
+  },
+  removeEditEx(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.exNames || !h.exNames[idx]) return;
+    const removed = h.exNames[idx];
+    h.exNames.splice(idx, 1);
+    h.exMeta.splice(idx, 1);
+    if (h.exNames.length === 0) h.trained = 0;
+    this.recalcEditDayBurn(dateStr);
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+    this.toast('已删除: ' + removed);
+  },
+  changeEditExMeta(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.exNames || !h.exNames[idx]) return;
+    const cur = h.exMeta[idx] || '';
+    wx.showModal({
+      title: '修改重量方案',
+      content: '',
+      editable: true,
+      placeholderText: '如 60kg 4组*10',
+      success: r => {
+        if (!r.confirm) return;
+        const newMeta = String(r.content || '').trim();
+        if (newMeta === cur) return;
+        h.exMeta[idx] = newMeta;
+        // 改 meta 也算有动作了；若原本未练 → 标记为已练
+        if (newMeta) h.trained = 1;
+        this.recalcEditDayBurn(dateStr);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已修改: ' + h.exNames[idx] + ' ' + newMeta);
+      }
+    });
+  },
+  clearEditDay() {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    wx.showModal({
+      title: '清空当天记录',
+      content: '确定要清空这一天的所有训练/摄入/饮水/RPE 吗？该操作不可撤销。',
+      confirmText: '清空',
+      confirmColor: '#c44',
+      success: r => {
+        if (!r.confirm) return;
+        // 重建空日记录
+        this.state.history[dateStr] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.closeOverlay();
+        this.toast('已清空 ' + dateStr);
+      }
+    });
+  },
+  ensureEditDay(dateStr) {
+    // 补录某个非今日的过去日期时，存储里可能根本没有该日键；补一个空记录骨架
+    if (!this.state.history[dateStr]) {
+      this.state.history[dateStr] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+    } else {
+      const h = this.state.history[dateStr];
+      if (h.trained == null) h.trained = 0;
+      if (!Array.isArray(h.exNames)) h.exNames = [];
+      if (!Array.isArray(h.exMeta)) h.exMeta = [];
+    }
+  },
+  recalcEditDayBurn(dateStr) {
+    // 当天（兜底：今天）走 estimateBurn；过去日没有 burn 缓存，只能粗略估算
+    const h = this.state.history[dateStr];
+    if (!h) return;
+    const isToday = dateStr === todayKey();
+    const exs = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', done: true }));
+    h.burn = this.estimateBurn(exs);
+    if (isToday) {
+      h.burn += this.getCardioBurn();
+      h.intake = this.getTotalIntake();
+      h.water = this.state.water * CUP_ML;
+    }
+  },
+  refreshAfterEditDay(dateStr) {
+    // 编辑后刷新弹窗内的"动作明细" + 摘要 + 热力图（burn 变了 → 颜色变了）
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    const summary = [];
+    summary.push({ k: '训练部位', v: h.dayName || (h.trained ? '训练日' : '休息日') });
+    summary.push({ k: '消耗', v: (h.burn || 0) + ' kcal' });
+    summary.push({ k: '摄入', v: (h.intake || 0) + ' kcal' });
+    summary.push({ k: '饮水', v: (h.water || 0) + ' ml' });
+    if (h.rpe) summary.push({ k: '自感强度 RPE', v: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
+    const exList = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', i: i }));
+    this.setData({ editExList: exList, heatDetailBody: summary, editDaySummary: summary });
+    // 刷新热力图与训练统计（连续天数 / 周训练 / 月训练 / 累计 都受补录影响）
+    this.renderHeatmap();
+    this.updateProgressStats();
   },
   updateProgressStats() {
     const now = new Date();
