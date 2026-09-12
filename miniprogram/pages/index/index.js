@@ -1858,6 +1858,7 @@ Page({
     const idx = e.currentTarget.dataset.i;
     const cur = this._editorDays[idx];
     if (!cur) return;
+    const self = this;
     wx.showModal({
       title: '修改训练日名称',
       content: '',
@@ -1866,11 +1867,22 @@ Page({
       success: r => {
         if (!r.confirm) return;
         const name = String(r.content || '').trim();
-        if (!name) { this.toast('名称不能为空'); return; }
+        if (!name) { self.toast('名称不能为空'); return; }
         if (name === cur.name) return;
         cur.name = name;
-        this.renderEditorDays();
-        this.toast('已修改为: ' + name);
+        self.renderEditorDays();
+        // 编辑现有计划时同步写回 state 并 saveState——避免「改了退出去又没有了」
+        // （新建计划 _detailPlanId==null 时不写回，等用户点保存按钮）
+        if (self._detailPlanId) {
+          const plan = self.getAllPlans().find(p => p.id === self._detailPlanId);
+          if (plan && plan.days && plan.days[idx]) {
+            plan.days[idx].name = name;
+            self.saveState();
+            self.toast('已修改为: ' + name);
+          }
+        } else {
+          self.toast('已修改为: ' + name);
+        }
       }
     });
   },
