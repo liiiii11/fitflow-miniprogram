@@ -2260,13 +2260,25 @@ Page({
     const h = this.state.history[dateStr];
     if (!h || !h.exNames || !h.exNames[idx]) return;
     const removed = h.exNames[idx];
-    h.exNames.splice(idx, 1);
-    h.exMeta.splice(idx, 1);
-    if (h.exNames.length === 0) h.trained = 0;
-    this.recalcEditDayBurn(dateStr);
-    this.saveState();
-    this.refreshAfterEditDay(dateStr);
-    this.toast('已删除: ' + removed);
+    wx.showModal({
+      title: '删除动作',
+      content: '是否删除「' + removed + '」？',
+      confirmText: '删除',
+      confirmColor: '#c44',
+      success: r => {
+        if (!r.confirm) return;
+        // 二次确认后才真正 splice，避免误点；删除后从 UI 重新拿最新 idx
+        const hh = this.state.history[dateStr];
+        if (!hh || !hh.exNames || !hh.exNames[idx]) return;
+        hh.exNames.splice(idx, 1);
+        hh.exMeta.splice(idx, 1);
+        if (hh.exNames.length === 0) hh.trained = 0;
+        this.recalcEditDayBurn(dateStr);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已删除: ' + removed);
+      }
+    });
   },
   changeEditExMeta(e) {
     const dateStr = this.data.editDate;
