@@ -214,6 +214,13 @@
 .heat-cell.today { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .heat-cell.disabled { opacity: .3; }
 .edit-day-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.edit-day-tabs { display: flex; gap: 6px; margin: 16px 0 8px; }
+.edit-day-tab { flex: 1; text-align: center; padding: 7px 0; font-size: 12px; color: var(--muted); background: var(--rule); border-radius: 8px; transition: all .15s; }
+.edit-day-tab.on { color: var(--text); background: rgba(212,120,92,.12); font-weight: 600; }
+.edit-meal-pill { flex: 1; text-align: center; padding: 6px 0; font-size: 12px; color: var(--muted); background: var(--rule); border-radius: 8px; }
+.edit-meal-pill.on { color: var(--text); background: rgba(212,120,92,.12); font-weight: 600; }
+.edit-supp-check { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--rule); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--accent); flex-shrink: 0; }
+.edit-supp-check.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .heat-sq { width: 10px; height: 10px; border-radius: 2px; }
 .heat-legend { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 10px; color: var(--muted); }
 

@@ -163,6 +163,12 @@ Page({
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [], heatPalette: HEAT_PALETTE,
     // 进度页热力图点击补录：当前正在补录/查看的日期，点击 heatmap 格子触发 openEditDay 设置
     editDate: '', editExName: '', editExMeta: '', editExList: [], editDaySummary: [],
+    // 补录四类 tab 切换与子表单：'str' 力量 / 'cardio' 有氧 / 'meal' 饮食 / 'supp' 补剂
+    editActiveTab: 'str',
+    editCardioName: '', editCardioDur: '', editCardioBurn: '',
+    editSuppName: '', editSuppUnit: '', editSuppDose: '', editSuppDone: false,
+    editMealType: 'breakfast', editMealName: '', editMealSub: '约100g', editMealCal: '',
+    editCardioList: [], editSuppsList: [], editMealsObject: { breakfast: [], lunch: [], dinner: [], snack: [] },
     growthBars: [], report: { hasData: false },
     // 今日自感强度 RPE（1~10，写入 history[今天].rpe）
     rpeChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rpeVal: 0, rpeText: '',
@@ -278,11 +284,15 @@ Page({
   },
   archiveDay(dateStr) {
     if (!this.state.history[dateStr]) {
-      this.state.history[dateStr] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+      this.state.history[dateStr] = this.emptyHistoryDay();
     }
     const h = this.state.history[dateStr];
     if (!h.intake) h.intake = this.getTotalIntake();
     if (!h.water) h.water = this.state.water * CUP_ML;
+    // 跨天归档兜底补三类型字段（兼容旧记录只有力量 schema 的情况）
+    if (!Array.isArray(h.cardio)) h.cardio = [];
+    if (!Array.isArray(h.supps)) h.supps = [];
+    if (!h.meals || typeof h.meals !== 'object') h.meals = { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } };
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days) {
       // 只在缺省时补记 planId/dayName：当天记录已由 recordTodayToHistory 写入
@@ -297,7 +307,7 @@ Page({
   recordTodayToHistory() {
     const today = todayKey();
     if (!this.state.history[today]) {
-      this.state.history[today] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+      this.state.history[today] = this.emptyHistoryDay();
     }
     const h = this.state.history[today];
     const completedExs = this.getCompletedExercises();
@@ -310,6 +320,10 @@ Page({
     h.exMeta = completedExs.map(e => e.meta || '').concat(doneCardio.map(c => c.meta || ''));
     h.intake = this.getTotalIntake();
     h.water = this.state.water * CUP_ML;
+    // 四类统一 schema：写入今天的有氧 / 饮食 / 补剂明细（供历史格子补录对齐）
+    h.cardio = doneCardio.map(c => ({ name: c.name, dur: c.dur, burn: c.burn, meta: c.meta || '' }));
+    h.supps = (this.state.supps || []).map(s => ({ name: s.name, unit: s.unit, dose: s.dose, done: !!s.done }));
+    h.meals = { breakfast: { items: ((this.state.meals.breakfast && this.state.meals.breakfast.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, lunch: { items: ((this.state.meals.lunch && this.state.meals.lunch.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, dinner: { items: ((this.state.meals.dinner && this.state.meals.dinner.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, snack: { items: ((this.state.meals.snack && this.state.meals.snack.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) } };
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days) {
       // 记录实际练过的训练日名（跨日切换后不丢）；没练则记当前查看的训练日
@@ -321,6 +335,10 @@ Page({
       h.planId = this.state.currentPlanId;
       h.dayName = trainedDayName || (day ? day.name : '');
     }
+  },
+  // 历史记录每天的标准空骨架（schema 与 recordTodayToHistory 对齐，便于补录写任意日期）
+  emptyHistoryDay() {
+    return { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [], cardio: [], supps: [], meals: { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } } };
   },
   saveState() {
     // 先刷新当天 history 再落盘：多处调用点是「saveState → updateIntake → recordTodayToHistory」，
@@ -2326,44 +2344,151 @@ Page({
     });
   },
   ensureEditDay(dateStr) {
-    // 补录某个非今日的过去日期时，存储里可能根本没有该日键；补一个空记录骨架
+    // 补录某个非今日的过去日期时，存储里可能根本没有该日键；补一个标准骨架（含四类）
     if (!this.state.history[dateStr]) {
-      this.state.history[dateStr] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
-    } else {
-      const h = this.state.history[dateStr];
-      if (h.trained == null) h.trained = 0;
-      if (!Array.isArray(h.exNames)) h.exNames = [];
-      if (!Array.isArray(h.exMeta)) h.exMeta = [];
+      this.state.history[dateStr] = this.emptyHistoryDay();
+      return;
     }
+    const h = this.state.history[dateStr];
+    if (h.trained == null) h.trained = 0;
+    if (!Array.isArray(h.exNames)) h.exNames = [];
+    if (!Array.isArray(h.exMeta)) h.exMeta = [];
+    if (!Array.isArray(h.cardio)) h.cardio = [];
+    if (!Array.isArray(h.supps)) h.supps = [];
+    if (!h.meals || typeof h.meals !== 'object') h.meals = { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } };
+    ['breakfast', 'lunch', 'dinner', 'snack'].forEach(k => {
+      if (!h.meals[k]) h.meals[k] = { items: [] };
+      if (!Array.isArray(h.meals[k].items)) h.meals[k].items = [];
+    });
+  },
+  // 把 h 中的各类转换成 UI 用的渲染列表（含索引 i 用于操作）
+  collectEditDayLists(h) {
+    const exList = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', i: i }));
+    const cardioList = (h.cardio || []).map((c, i) => ({
+      name: c.name || '',
+      dur: c.dur || 0,
+      burn: c.burn || 0,
+      meta: c.meta || (c.dur ? c.dur + '分钟' : ''),
+      i: i
+    }));
+    const suppsList = (h.supps || []).map((s, i) => ({
+      name: s.name || '',
+      unit: s.unit || '',
+      dose: s.dose || '',
+      done: !!s.done,
+      i: i
+    }));
+    const mealsObj = { breakfast: [], lunch: [], dinner: [], snack: [] };
+    if (h.meals && typeof h.meals === 'object') {
+      ['breakfast', 'lunch', 'dinner', 'snack'].forEach(k => {
+        mealsObj[k] = ((h.meals[k] && h.meals[k].items) || []).map((x, i) => ({
+          name: x.name || '',
+          sub: x.sub || '',
+          cal: x.cal || 0,
+          i: i
+        }));
+      });
+    }
+    return { exList, cardioList, suppsList, mealsObj };
   },
   recalcEditDayBurn(dateStr) {
-    // 当天（兜底：今天）走 estimateBurn；过去日没有 burn 缓存，只能粗略估算
+    // 重算 burn/intake/trained，写回历史格。补录因为 h.schema 已统一，直接走 estimate / 累加
     const h = this.state.history[dateStr];
     if (!h) return;
     const isToday = dateStr === todayKey();
     const exs = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', done: true }));
-    h.burn = this.estimateBurn(exs);
+    let burn = this.estimateBurn(exs);
+    // 有氧 burn = 已练总和（手动补录的 burn 字段就是真相值，不再二次估算）
+    if (Array.isArray(h.cardio)) burn += h.cardio.reduce((s, c) => s + (isFinite(c.burn) ? c.burn : 0), 0);
+    h.burn = burn;
+    // 摄入 = meals 各餐累加
+    if (h.meals && typeof h.meals === 'object') {
+      let it = 0;
+      ['breakfast', 'lunch', 'dinner', 'snack'].forEach(k => {
+        ((h.meals[k] && h.meals[k].items) || []).forEach(x => { it += isFinite(x.cal) ? x.cal : 0; });
+      });
+      h.intake = it;
+    }
+    // trained 判定：力量动作 或 有氧动作 都算训练日
+    if (Array.isArray(h.cardio) && h.cardio.length > 0) h.trained = 1;
     if (isToday) {
+      // 今天仍以 state 为准（user 实时打卡），但补录写过的有氧也累加
       h.burn += this.getCardioBurn();
       h.intake = this.getTotalIntake();
       h.water = this.state.water * CUP_ML;
     }
   },
-  refreshAfterEditDay(dateStr) {
-    // 编辑后刷新弹窗内的"动作明细" + 摘要 + 热力图（burn 变了 → 颜色变了）
-    this.ensureEditDay(dateStr);
-    const h = this.state.history[dateStr];
+  buildEditDaySummary(h, dateStr) {
     const summary = [];
     summary.push({ k: '训练部位', v: h.dayName || (h.trained ? '训练日' : '休息日') });
     summary.push({ k: '消耗', v: (h.burn || 0) + ' kcal' });
     summary.push({ k: '摄入', v: (h.intake || 0) + ' kcal' });
     summary.push({ k: '饮水', v: (h.water || 0) + ' ml' });
     if (h.rpe) summary.push({ k: '自感强度 RPE', v: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
-    const exList = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', i: i }));
-    this.setData({ editExList: exList, heatDetailBody: summary, editDaySummary: summary });
+    return summary;
+  },
+  refreshAfterEditDay(dateStr) {
+    // 编辑后刷新弹窗内的四类明细 + 摘要 + 热力图（burn 变了 → 颜色变了）
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    const summary = this.buildEditDaySummary(h, dateStr);
+    const lists = this.collectEditDayLists(h);
+    this.setData({
+      editExList: lists.exList,
+      editCardioList: lists.cardioList,
+      editSuppsList: lists.suppsList,
+      editMealsObject: lists.mealsObj,
+      heatDetailBody: summary,
+      editDaySummary: summary
+    });
     // 刷新热力图与训练统计（连续天数 / 周训练 / 月训练 / 累计 都受补录影响）
     this.renderHeatmap();
     this.updateProgressStats();
+  },
+  // 切换补录 tab
+  setEditActiveTab(e) {
+    const tab = e.currentTarget.dataset.tab;
+    if (tab && ['str', 'cardio', 'meal', 'supp'].indexOf(tab) >= 0) {
+      this.setData({ editActiveTab: tab });
+    }
+  },
+  // 把 openEditDay 中"摘要+列表初始化"提出来，扩展支持四类
+  openEditDay(e) {
+    const dateStr = e.currentTarget.dataset.ds;
+    if (!dateStr) return;
+    if (dateStr > todayKey()) return;
+    this.ensureEditDay(dateStr);
+    const parts = dateStr.split('-');
+    const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+    const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    const isToday = dateStr === todayKey();
+    // 本地午夜起算，避免 Date.now() 跨时区造成 1 天偏差
+    const todayMid = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+    const targetMid = new Date(y, m, d).getTime();
+    const agoDays = isToday ? 0 : Math.round((todayMid - targetMid) / 86400000);
+    const title = MONTH_CN[m] + d + '日 ' + dayNames[new Date(y, m, d).getDay()] + (agoDays > 0 ? ' (距今 ' + agoDays + ' 天)' : ' · 今日');
+    const h = this.state.history[dateStr];
+    const summary = this.buildEditDaySummary(h, dateStr);
+    const lists = this.collectEditDayLists(h);
+    // 默认 tab：今天 + 已有力量 / 有氧 → 落到 str；今天 + 只有饮食/补剂 → 落到 meal/supp；过去日 → str
+    let initialTab = 'str';
+    if ((h.exNames || []).length > 0 || (h.cardio || []).length > 0) initialTab = 'str';
+    this.setData({
+      editDate: dateStr,
+      editDaySummary: summary,
+      editExList: lists.exList,
+      editCardioList: lists.cardioList,
+      editSuppsList: lists.suppsList,
+      editMealsObject: lists.mealsObj,
+      editExName: '', editExMeta: '',
+      editCardioName: '', editCardioDur: '', editCardioBurn: '',
+      editSuppName: '', editSuppUnit: '', editSuppDose: '', editSuppDone: false,
+      editMealName: '', editMealSub: '约100g', editMealCal: '',
+      editActiveTab: initialTab,
+      heatDetailTitle: title,
+      heatDetailBody: summary
+    });
+    this.openModal('heatDetail');
   },
   updateProgressStats() {
     const now = new Date();
@@ -2382,6 +2507,213 @@ Page({
     Object.keys(this.state.history).forEach(k => { if (this.state.history[k].trained) totalTrainDays++; });
     const streak = this.calcStreak();
     this.setData({ weekTrain: weekTrained + '/7', totalTrain: totalTrainDays + ' 天', streakDays: streak + ' 天' });
+  },
+
+  // ========== 补录：有氧 ==========
+  onEditCardioName(e) { this.setData({ editCardioName: e.detail.value }); },
+  onEditCardioDur(e) { this.setData({ editCardioDur: e.detail.value }); },
+  onEditCardioBurn(e) { this.setData({ editCardioBurn: e.detail.value }); },
+  addEditCardio() {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const name = (this.data.editCardioName || '').trim();
+    if (!name) { this.toast('请输入有氧项目名称'); return; }
+    const dur = parseFloat(this.data.editCardioDur) || 0;
+    // 缺 burn 时按 8 kcal/分钟估算（与主页有氧默认一致）
+    let burn = parseFloat(this.data.editCardioBurn);
+    if (!isFinite(burn) || burn <= 0) burn = dur > 0 ? Math.round(dur * 8) : 0;
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    if (h.cardio.some(c => c.name === name)) { this.toast('该有氧项目已存在，可直接在原行改/删'); return; }
+    h.cardio.push({ name, dur, burn: Math.round(burn), meta: (dur ? dur + '分钟' : '') + (burn ? '·' + Math.round(burn) + 'kcal' : '') });
+    this.recalcEditDayBurn(dateStr);
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+    this.setData({ editCardioName: '', editCardioDur: '', editCardioBurn: '' });
+    this.toast('已添加有氧: ' + name + (dur ? ' ' + dur + '分钟' : ''));
+  },
+  removeEditCardio(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.cardio || !h.cardio[idx]) return;
+    const removed = h.cardio[idx].name;
+    wx.showModal({
+      title: '删除有氧',
+      content: '是否删除「' + removed + '」？',
+      confirmText: '删除',
+      confirmColor: '#c44',
+      success: r => {
+        if (!r.confirm) return;
+        const hh = this.state.history[dateStr];
+        if (!hh || !hh.cardio || !hh.cardio[idx]) return;
+        hh.cardio.splice(idx, 1);
+        this.recalcEditDayBurn(dateStr);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已删除: ' + removed);
+      }
+    });
+  },
+  changeEditCardio(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.cardio || !h.cardio[idx]) return;
+    const c = h.cardio[idx];
+    wx.showModal({
+      title: '修改有氧（耗时 / 消耗）',
+      content: (c.dur || 0) + ',' + (c.burn || 0),
+      editable: true,
+      placeholderText: '如 30,240',
+      success: r => {
+        if (!r.confirm) return;
+        const txt = String(r.content || '').trim();
+        const m = /^(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)$/.exec(txt);
+        if (!m) { this.toast('格式错误，请填「分钟, 消耗」(如 30,240)'); return; }
+        c.dur = parseFloat(m[1]);
+        c.burn = parseFloat(m[2]);
+        c.meta = c.dur + '分钟·' + Math.round(c.burn) + 'kcal';
+        this.recalcEditDayBurn(dateStr);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已更新: ' + c.name);
+      }
+    });
+  },
+
+  // ========== 补录：饮食 ==========
+  onEditMealName(e) { this.setData({ editMealName: e.detail.value }); },
+  onEditMealSub(e) { this.setData({ editMealSub: e.detail.value }); },
+  onEditMealCal(e) { this.setData({ editMealCal: e.detail.value }); },
+  setEditMealType(e) {
+    const t = e.currentTarget.dataset.t;
+    if (['breakfast', 'lunch', 'dinner', 'snack'].indexOf(t) >= 0) this.setData({ editMealType: t });
+  },
+  addEditMeal() {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const name = (this.data.editMealName || '').trim();
+    if (!name) { this.toast('请输入食物名称'); return; }
+    const sub = (this.data.editMealSub || '').trim() || '约100g';
+    const cal = parseFloat(this.data.editMealCal);
+    if (!isFinite(cal) || cal < 0) { this.toast('请输入有效热量（数字）'); return; }
+    const mealType = this.data.editMealType;
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    h.meals[mealType].items.push({ name, sub, cal: Math.round(cal) });
+    this.recalcEditDayBurn(dateStr);
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+    this.setData({ editMealName: '', editMealCal: '' });
+    this.toast('已添加: ' + name + ' ' + Math.round(cal) + ' kcal');
+  },
+  removeEditMeal(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const t = e.currentTarget.dataset.t;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.meals || !h.meals[t] || !h.meals[t].items[idx]) return;
+    const removed = h.meals[t].items[idx].name;
+    wx.showModal({
+      title: '删除食物',
+      content: '是否删除「' + removed + '」？',
+      confirmText: '删除',
+      confirmColor: '#c44',
+      success: r => {
+        if (!r.confirm) return;
+        const hh = this.state.history[dateStr];
+        if (!hh || !hh.meals || !hh.meals[t] || !hh.meals[t].items[idx]) return;
+        hh.meals[t].items.splice(idx, 1);
+        this.recalcEditDayBurn(dateStr);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已删除: ' + removed);
+      }
+    });
+  },
+
+  // ========== 补录：补剂 ==========
+  onEditSuppName(e) { this.setData({ editSuppName: e.detail.value }); },
+  onEditSuppUnit(e) { this.setData({ editSuppUnit: e.detail.value }); },
+  onEditSuppDose(e) { this.setData({ editSuppDose: e.detail.value }); },
+  onEditSuppDone(e) { this.setData({ editSuppDone: !!e.detail.value }); },
+  addEditSupp() {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const name = (this.data.editSuppName || '').trim();
+    if (!name) { this.toast('请输入补剂名称'); return; }
+    const dose = (this.data.editSuppDose || '').trim();
+    const unit = (this.data.editSuppUnit || '').trim();
+    if (!dose) { this.toast('请输入剂量'); return; }
+    this.ensureEditDay(dateStr);
+    const h = this.state.history[dateStr];
+    h.supps.push({ name, unit, dose, done: !!this.data.editSuppDone });
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+    this.setData({ editSuppName: '', editSuppUnit: '', editSuppDose: '', editSuppDone: false });
+    this.toast('已添加补剂: ' + name + ' ' + dose + (unit ? unit : ''));
+  },
+  toggleEditSupp(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.supps || !h.supps[idx]) return;
+    h.supps[idx].done = !h.supps[idx].done;
+    this.saveState();
+    this.refreshAfterEditDay(dateStr);
+  },
+  changeEditSupp(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.supps || !h.supps[idx]) return;
+    const s = h.supps[idx];
+    wx.showModal({
+      title: '修改补剂',
+      content: (s.dose || '') + (s.unit || ''),
+      editable: true,
+      placeholderText: '如 5g 或 2片',
+      success: r => {
+        if (!r.confirm) return;
+        const txt = String(r.content || '').trim();
+        if (!txt) { this.toast('剂量不能为空'); return; }
+        // 拆分数字部分到 dose，单位部分保留
+        const m = /^([\d.]+)\s*(.*)$/.exec(txt);
+        if (m) { s.dose = m[1]; s.unit = m[2] || s.unit; } else { s.dose = txt; }
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已更新: ' + s.name + ' ' + s.dose + (s.unit || ''));
+      }
+    });
+  },
+  removeEditSupp(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.supps || !h.supps[idx]) return;
+    const removed = h.supps[idx].name;
+    wx.showModal({
+      title: '删除补剂',
+      content: '是否删除「' + removed + '」？',
+      confirmText: '删除',
+      confirmColor: '#c44',
+      success: r => {
+        if (!r.confirm) return;
+        const hh = this.state.history[dateStr];
+        if (!hh || !hh.supps || !hh.supps[idx]) return;
+        hh.supps.splice(idx, 1);
+        this.saveState();
+        this.refreshAfterEditDay(dateStr);
+        this.toast('已删除: ' + removed);
+      }
+    });
   },
 
   renderGrowthBars(weekly) {

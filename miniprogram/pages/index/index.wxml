@@ -598,32 +598,144 @@
         <text style="margin-left:auto">{{item.v}}</text>
       </view>
     </view>
-    <view style="display:flex;align-items:baseline;justify-content:space-between;margin:14px 0 8px">
-      <text style="color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em">完成动作 ({{editExList.length}})</text>
-      <text wx:if="{{editDate}}" style="font-size:10px;color:var(--muted)">点名称可改、点 ✎ 改方案、点 ✕ 删</text>
+
+    <!-- 补录四 tab 切换 -->
+    <view class="edit-day-tabs">
+      <view class="edit-day-tab {{editActiveTab==='str'?'on':''}}" bindtap="setEditActiveTab" data-tab="str">力量 ({{editExList.length}})</view>
+      <view class="edit-day-tab {{editActiveTab==='cardio'?'on':''}}" bindtap="setEditActiveTab" data-tab="cardio">有氧 ({{editCardioList.length}})</view>
+      <view class="edit-day-tab {{editActiveTab==='meal'?'on':''}}" bindtap="setEditActiveTab" data-tab="meal">饮食</view>
+      <view class="edit-day-tab {{editActiveTab==='supp'?'on':''}}" bindtap="setEditActiveTab" data-tab="supp">补剂 ({{editSuppsList.length}})</view>
     </view>
-    <view wx:if="{{editExList.length === 0}}" style="font-size:13px;color:var(--muted);padding:10px 0">这一天还没有动作记录，可在下方添加。</view>
-    <view wx:for="{{editExList}}" wx:key="i" class="edit-day-row">
-      <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-        <text style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
-        <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="changeEditExMeta" data-i="{{item.i}}">{{item.name}}</text>
-        <text wx:if="{{item.meta}}" style="font-size:12px;color:var(--muted);flex-shrink:0;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· {{item.meta}}</text>
+
+    <!-- 力量 tab -->
+    <block wx:if="{{editActiveTab==='str'}}">
+      <view wx:if="{{editExList.length === 0}}" style="font-size:13px;color:var(--muted);padding:10px 0">这一天还没有力量动作，可在下方添加。</view>
+      <view wx:for="{{editExList}}" wx:key="i" class="edit-day-row">
+        <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <text style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
+          <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="changeEditExMeta" data-i="{{item.i}}">{{item.name}}</text>
+          <text wx:if="{{item.meta}}" style="font-size:12px;color:var(--muted);flex-shrink:0;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· {{item.meta}}</text>
+        </view>
+        <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
+          <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditExMeta" data-i="{{item.i}}">改</text>
+          <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditEx" data-i="{{item.i}}">删</text>
+        </view>
       </view>
-      <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
-        <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditExMeta" data-i="{{item.i}}">改</text>
-        <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditEx" data-i="{{item.i}}">删</text>
+      <view style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)">
+        <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加力量动作</text>
+        <view style="display:flex;flex-direction:column;gap:8px">
+          <input class="fg__inp" placeholder="动作名称（如：卧推）" value="{{editExName}}" bindinput="onEditExName" style="font-size:15px" cursor-spacing="100"/>
+          <input class="fg__inp" placeholder="重量方案（选填，如：60kg 4组*10）" value="{{editExMeta}}" bindinput="onEditExMeta" style="font-size:15px" cursor-spacing="100"/>
+          <button class="btn btn--pri btn--fw" bindtap="addEditEx">添加</button>
+        </view>
       </view>
-    </view>
-    <!-- 添加新动作 -->
-    <view style="margin-top:18px;padding-top:14px;border-top:1px solid var(--rule)">
-      <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加动作</text>
-      <view style="display:flex;flex-direction:column;gap:8px">
-        <input class="fg__inp" placeholder="动作名称（如：卧推）" value="{{editExName}}" bindinput="onEditExName" style="font-size:15px" cursor-spacing="100"/>
-        <input class="fg__inp" placeholder="重量方案（选填，如：60kg 4组*10）" value="{{editExMeta}}" bindinput="onEditExMeta" style="font-size:15px" cursor-spacing="100"/>
-        <button class="btn btn--pri btn--fw" bindtap="addEditEx">添加</button>
+    </block>
+
+    <!-- 有氧 tab -->
+    <block wx:if="{{editActiveTab==='cardio'}}">
+      <view wx:if="{{editCardioList.length === 0}}" style="font-size:13px;color:var(--muted);padding:10px 0">这一天还没有有氧，可在下方添加。</view>
+      <view wx:for="{{editCardioList}}" wx:key="i" class="edit-day-row">
+        <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <text style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
+          <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</text>
+          <text style="font-size:12px;color:var(--muted);flex-shrink:0">{{item.dur}}分钟·{{item.burn}}kcal</text>
+        </view>
+        <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
+          <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditCardio" data-i="{{item.i}}">改</text>
+          <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditCardio" data-i="{{item.i}}">删</text>
+        </view>
       </view>
-    </view>
-    <view style="display:flex;gap:12px;margin-top:18px">
+      <view style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)">
+        <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加有氧</text>
+        <view style="display:flex;flex-direction:column;gap:8px">
+          <input class="fg__inp" placeholder="项目（如：跑步）" value="{{editCardioName}}" bindinput="onEditCardioName" style="font-size:15px" cursor-spacing="100"/>
+          <view style="display:flex;gap:8px;align-items:center">
+            <input class="fg__inp" type="digit" placeholder="分钟" value="{{editCardioDur}}" bindinput="onEditCardioDur" style="flex:1;font-size:15px" cursor-spacing="100"/>
+            <text style="font-size:12px;color:var(--muted);white-space:nowrap">分钟</text>
+          </view>
+          <view style="display:flex;gap:8px;align-items:center">
+            <input class="fg__inp" type="digit" placeholder="消耗（留空按 8 kcal/分钟自动估算）" value="{{editCardioBurn}}" bindinput="onEditCardioBurn" style="flex:1;font-size:15px" cursor-spacing="100"/>
+            <text style="font-size:12px;color:var(--muted);white-space:nowrap">kcal</text>
+          </view>
+          <button class="btn btn--pri btn--fw" bindtap="addEditCardio">添加</button>
+        </view>
+      </view>
+    </block>
+
+    <!-- 饮食 tab（按 4 餐分组，每组独立展示与添加）-->
+    <block wx:if="{{editActiveTab==='meal'}}">
+      <block wx:for="{{['breakfast','lunch','dinner','snack']}}" wx:key="tk" wx:for-item="mealKey">
+        <view style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+          <text style="font-weight:600;font-size:13px;color:var(--text);flex:1">{{mealKey==='breakfast'?'早餐':mealKey==='lunch'?'午餐':mealKey==='dinner'?'晚餐':'加餐'}} ({{editMealsObject[mealKey].length}})</text>
+        </view>
+        <view wx:if="{{editMealsObject[mealKey].length === 0}}" style="font-size:12px;color:var(--muted);padding:6px 0 12px">这一餐暂无食物</view>
+        <view wx:for="{{editMealsObject[mealKey]}}" wx:key="mi" wx:for-item="m" class="edit-day-row">
+          <view style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{m.name}}<text style="font-size:11px;color:var(--muted);margin-left:6px">{{m.sub}}</text></text>
+            <text style="font-size:12px;color:var(--accent);font-weight:600;flex-shrink:0">{{m.cal}} kcal</text>
+          </view>
+          <text wx:if="{{editMealType === mealKey}}" style="font-size:13px;color:var(--danger);font-weight:500;margin-left:12px;flex-shrink:0" bindtap="removeEditMeal" data-t="{{mealKey}}" data-i="{{m.i}}">删</text>
+          <text wx:else style="font-size:13px;color:var(--danger);font-weight:500;margin-left:12px;flex-shrink:0" bindtap="removeEditMeal" data-t="{{mealKey}}" data-i="{{m.i}}">删</text>
+        </view>
+      </block>
+
+      <view style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)">
+        <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加食物</text>
+        <!-- 餐类型切换 -->
+        <view style="display:flex;gap:6px;margin-bottom:10px">
+          <view class="edit-meal-pill {{editMealType==='breakfast'?'on':''}}" bindtap="setEditMealType" data-t="breakfast">早餐</view>
+          <view class="edit-meal-pill {{editMealType==='lunch'?'on':''}}" bindtap="setEditMealType" data-t="lunch">午餐</view>
+          <view class="edit-meal-pill {{editMealType==='dinner'?'on':''}}" bindtap="setEditMealType" data-t="dinner">晚餐</view>
+          <view class="edit-meal-pill {{editMealType==='snack'?'on':''}}" bindtap="setEditMealType" data-t="snack">加餐</view>
+        </view>
+        <view style="display:flex;flex-direction:column;gap:8px">
+          <input class="fg__inp" placeholder="食物名称（如：鸡胸肉）" value="{{editMealName}}" bindinput="onEditMealName" style="font-size:15px" cursor-spacing="100"/>
+          <view style="display:flex;gap:8px;align-items:center">
+            <input class="fg__inp" placeholder="份量（默认约100g）" value="{{editMealSub}}" bindinput="onEditMealSub" style="flex:1;font-size:15px" cursor-spacing="100"/>
+          </view>
+          <view style="display:flex;gap:8px;align-items:center">
+            <input class="fg__inp" type="digit" placeholder="热量" value="{{editMealCal}}" bindinput="onEditMealCal" style="flex:1;font-size:15px" cursor-spacing="100"/>
+            <text style="font-size:12px;color:var(--muted);white-space:nowrap">kcal</text>
+          </view>
+          <button class="btn btn--pri btn--fw" bindtap="addEditMeal">添加到{{editMealType==='breakfast'?'早餐':editMealType==='lunch'?'午餐':editMealType==='dinner'?'晚餐':'加餐'}}</button>
+        </view>
+      </view>
+    </block>
+
+    <!-- 补剂 tab -->
+    <block wx:if="{{editActiveTab==='supp'}}">
+      <view wx:if="{{editSuppsList.length === 0}}" style="font-size:13px;color:var(--muted);padding:10px 0">这一天还没有补剂记录，可在下方添加。</view>
+      <view wx:for="{{editSuppsList}}" wx:key="i" class="edit-day-row">
+        <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <view style="display:flex;align-items:center;gap:6px;flex:1;min-width:0" bindtap="toggleEditSupp" data-i="{{item.i}}">
+            <view class="edit-supp-check {{item.done?'on':''}}">{{item.done?'✓':''}}</view>
+            <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{item.name}}</text>
+          </view>
+          <text style="font-size:12px;color:var(--muted);flex-shrink:0" bindtap="changeEditSupp" data-i="{{item.i}}">{{item.dose}}{{item.unit}}</text>
+        </view>
+        <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
+          <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditSupp" data-i="{{item.i}}">改</text>
+          <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditSupp" data-i="{{item.i}}">删</text>
+        </view>
+      </view>
+      <view style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)">
+        <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加补剂</text>
+        <view style="display:flex;flex-direction:column;gap:8px">
+          <input class="fg__inp" placeholder="补剂名称（如：肌酸）" value="{{editSuppName}}" bindinput="onEditSuppName" style="font-size:15px" cursor-spacing="100"/>
+          <view style="display:flex;gap:8px;align-items:center">
+            <input class="fg__inp" placeholder="剂量" value="{{editSuppDose}}" bindinput="onEditSuppDose" style="flex:1;font-size:15px" cursor-spacing="100"/>
+            <input class="fg__inp" placeholder="单位" value="{{editSuppUnit}}" bindinput="onEditSuppUnit" style="flex:1;font-size:15px" cursor-spacing="100"/>
+          </view>
+          <view style="display:flex;align-items:center;gap:8px">
+            <switch checked="{{editSuppDone}}" bindchange="onEditSuppDone" style="transform:scale(.8)"/>
+            <text style="font-size:13px;color:var(--muted)">今日已服</text>
+          </view>
+          <button class="btn btn--pri btn--fw" bindtap="addEditSupp">添加</button>
+        </view>
+      </view>
+    </block>
+
+    <view style="display:flex;gap:12px;margin-top:22px">
       <button class="btn btn--ghost" style="flex:1" bindtap="clearEditDay">清空当天</button>
       <button class="btn btn--pri btn--fw" style="flex:2" bindtap="closeOverlay">关闭</button>
     </view>
