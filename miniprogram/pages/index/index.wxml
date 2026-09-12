@@ -613,20 +613,73 @@
       <view wx:for="{{editExList}}" wx:key="i" class="edit-day-row">
         <view style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
           <text style="color:var(--accent);font-weight:600;flex-shrink:0">✓</text>
-          <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="changeEditExMeta" data-i="{{item.i}}">{{item.name}}</text>
+          <text style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" bindtap="changeEditEx" data-i="{{item.i}}">{{item.name}}</text>
           <text wx:if="{{item.meta}}" style="font-size:12px;color:var(--muted);flex-shrink:0;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· {{item.meta}}</text>
+          <text wx:if="{{item.intensity}}" class="edit-ex-rpe-badge">{{item.intensity}}</text>
         </view>
         <view style="display:flex;gap:12px;flex-shrink:0;margin-left:8px">
-          <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditExMeta" data-i="{{item.i}}">改</text>
+          <text style="font-size:13px;color:var(--text);font-weight:500" bindtap="changeEditEx" data-i="{{item.i}}">改</text>
           <text style="font-size:13px;color:var(--danger);font-weight:500" bindtap="removeEditEx" data-i="{{item.i}}">删</text>
         </view>
       </view>
+
       <view style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)">
-        <text style="display:block;color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em;margin-bottom:10px">+ 添加力量动作</text>
-        <view style="display:flex;flex-direction:column;gap:8px">
+        <view style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <text style="color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.05em">{{editExIndex>=0 ? '修改动作' : '+ 添加力量动作'}}</text>
+          <text wx:if="{{editExIndex>=0}}" style="font-size:12px;color:var(--accent);font-weight:500" bindtap="cancelEditEx">取消编辑</text>
+        </view>
+        <view style="display:flex;flex-direction:column;gap:10px">
           <input class="fg__inp" placeholder="动作名称（如：卧推）" value="{{editExName}}" bindinput="onEditExName" style="font-size:15px" cursor-spacing="100"/>
-          <input class="fg__inp" placeholder="重量方案（选填，如：60kg 4组*10）" value="{{editExMeta}}" bindinput="onEditExMeta" style="font-size:15px" cursor-spacing="100"/>
-          <button class="btn btn--pri btn--fw" bindtap="addEditEx">添加</button>
+
+          <!-- 固定 / 递增 mode-segment（与主页完全一致：灰轨+空心细描边胶囊） -->
+          <view class="mode-seg">
+            <view class="mode-chips">
+              <view class="mode-thumb {{editLoadMode==='prog'?'right':''}}"></view>
+              <view class="mode-chip {{editLoadMode==='fixed'?'on':''}}" data-m="fixed" catchtap="switchEditExMode">固定</view>
+              <view class="mode-chip {{editLoadMode==='prog'?'on':''}}" data-m="prog" catchtap="switchEditExMode">递增</view>
+            </view>
+            <text class="mode-seg__tip">{{editLoadMode==='fixed'?'每组同一重量、组数与次数':'逐组加重，每组重量可不同'}}</text>
+          </view>
+
+          <!-- 固定面板 -->
+          <view class="ex-pane {{editShowMode==='fixed'?'':'ex-pane-hide'}}">
+            <view class="fg__row">
+              <view class="fg"><text class="fg__lbl">重量 (kg)</text><input class="fg__inp" type="digit" placeholder="如 60" value="{{editExWt}}" bindinput="onEditExWt" cursor-spacing="120"/></view>
+              <view class="fg"><text class="fg__lbl">组数</text><input class="fg__inp" type="number" placeholder="如 4" value="{{editExSets}}" bindinput="onEditExSets" cursor-spacing="120"/></view>
+              <view class="fg"><text class="fg__lbl">次数</text><input class="fg__inp" type="number" placeholder="如 12" value="{{editExReps}}" bindinput="onEditExReps" cursor-spacing="120"/></view>
+            </view>
+            <view style="font-size:11px;color:var(--muted);margin-top:4px">三项均可留空（稍后也可再改），单位 kg</view>
+          </view>
+
+          <!-- 递增面板（首次切到时再创建，避免初始就渲染） -->
+          <view wx:if="{{editProgMounted}}" class="ex-pane {{editShowMode==='prog'?'':'ex-pane-hide'}}">
+            <view style="display:flex;align-items:flex-end;gap:12px">
+              <view class="fg" style="flex:0 0 140px;margin-bottom:6px"><text class="fg__lbl">组数 (1-6)</text><input class="fg__inp" type="number" placeholder="如 3" value="{{editProgSets}}" bindinput="onEditExProgSets" bindblur="onEditExProgSetsBlur" cursor-spacing="120"/></view>
+              <text style="font-size:11px;color:var(--muted);flex:1;padding-bottom:14px">按顺序填每组重量和次数，后一组更重即为递增</text>
+            </view>
+            <view style="border-top:1px solid var(--rule);margin-top:2px">
+              <view wx:for="{{editProgRows}}" wx:key="index" class="prog-row">
+                <text class="prog-row__idx">第{{index+1}}组</text>
+                <input class="prog-row__inp" type="digit" placeholder="重量" value="{{item.wt}}" data-i="{{index}}" bindinput="onEditExProgWt" cursor-spacing="120"/>
+                <text class="prog-row__x">×</text>
+                <input class="prog-row__inp" type="number" placeholder="次数" value="{{item.reps}}" data-i="{{index}}" bindinput="onEditExProgReps" cursor-spacing="120"/>
+              </view>
+            </view>
+            <view style="font-size:11px;color:var(--muted);margin-top:6px">例：第1组 60×12、第2组 70×10、第3组 80×8；整行为空自动跳过</view>
+          </view>
+
+          <!-- 强度 5 档（每动作；旧 RPE 是每日整体，不冲突） -->
+          <view style="margin-top:4px">
+            <text class="fg__lbl">强度（每动作；选填）</text>
+            <view class="edit-rpe-pick">
+              <view wx:for="{{editIntensityChips}}" wx:key="*this" class="edit-rpe-pick__i {{editExIntensity===item?'on':''}}" data-v="{{item}}" bindtap="setEditExIntensity">
+                <text style="font-size:14px;font-weight:600">{{item}}</text>
+                <text class="edit-rpe-pick__lbl">{{editIntensityLabels[index]}}</text>
+              </view>
+            </view>
+          </view>
+
+          <button class="btn btn--pri btn--fw" bindtap="addEditEx">{{editExIndex>=0 ? '保存修改' : '添加'}}</button>
         </view>
       </view>
     </block>

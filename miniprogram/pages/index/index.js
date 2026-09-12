@@ -163,6 +163,19 @@ Page({
     heatYear: 0, heatMonth: 0, heatmapMonthLabel: '', heatmapDaysLabel: '', heatmap: [], heatPalette: HEAT_PALETTE,
     // 进度页热力图点击补录：当前正在补录/查看的日期，点击 heatmap 格子触发 openEditDay 设置
     editDate: '', editExName: '', editExMeta: '', editExList: [], editDaySummary: [],
+    // 补录 - 力量 tab：与主页 exLoadMode/exShowMode 严格对齐的固定/递增双表单
+    //   固定面板字段：editExWt/editExSets/editExReps
+    //   递增面板字段：editProgSets(组数1-6) + editProgRows(逐组 wt/reps)
+    //   editProgMounted：递增面板懒挂载标记（首次切到递增时=true，此后常驻仅显隐）
+    editExWt: '', editExSets: '', editExReps: '',
+    editLoadMode: 'fixed', editShowMode: 'fixed', editProgMounted: false,
+    editProgSets: '3', editProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+    // 补录 - 力量 tab：每动作自感强度（0 未选 / 1-5）
+    editIntensityChips: [1, 2, 3, 4, 5],
+    editIntensityLabels: ['轻松', '适中', '较累', '费力', '极限'],
+    editExIntensity: 0,
+    // 补录 - 力量 tab：编辑现有动作模式 (-1 = 新增；>=0 = 该 idx 进入 update 分支)
+    editExIndex: -1,
     // 补录四类 tab 切换与子表单：'str' 力量 / 'cardio' 有氧 / 'meal' 饮食 / 'supp' 补剂
     editActiveTab: 'str',
     editCardioName: '', editCardioDur: '', editCardioBurn: '',
@@ -338,7 +351,9 @@ Page({
   },
   // 历史记录每天的标准空骨架（schema 与 recordTodayToHistory 对齐，便于补录写任意日期）
   emptyHistoryDay() {
-    return { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [], cardio: [], supps: [], meals: { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } } };
+    // exIntensity：每动作的 5 档自感强度（0 未选 / 1 轻松 / 2 适中 / 3 较累 / 4 费力 / 5 极限），
+    // 与 exNames/exMeta 同长度并行存在；旧数据无该字段时 ensureEditDay 兜底补 []
+    return { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [], exIntensity: [], cardio: [], supps: [], meals: { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } } };
   },
   saveState() {
     // 先刷新当天 history 再落盘：多处调用点是「saveState → updateIntake → recordTodayToHistory」，
@@ -2249,27 +2264,172 @@ Page({
     this.openModal('heatDetail');
   },
   onEditExName(e) { this.setData({ editExName: e.detail.value }); },
-  onEditExMeta(e) { this.setData({ editExMeta: e.detail.value }); },
+  // 编辑回填或新增后清空时使用：把力量 tab 表单字段统一重置为默认。
+  // 固定/递增切换标志、强度、editExIndex 一并清零，确保下次进入是真正的「新增」状态。
+  resetEditExForm() {
+    this.setData({
+      editExName: '', editExMeta: '',
+      editExWt: '', editExSets: '', editExReps: '',
+      editLoadMode: 'fixed', editShowMode: 'fixed', editProgMounted: false,
+      editProgSets: '3', editProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+      editExIntensity: 0,
+      editExIndex: -1
+    });
+  },
+  // ===== 补录 - 力量 tab：固定 / 递增 双面板 =====
+  onEditExWt(e) { this.setData({ editExWt: e.detail.value }); },
+  onEditExSets(e) { this.setData({ editExSets: e.detail.value }); },
+  onEditExReps(e) { this.setData({ editExReps: e.detail.value }); },
+  // 切换 mode：严格对齐 home 的 switchExMode，仅字段名前缀 edit*，保留同名同语义。
+  //   - chip 高亮：editLoadMode 切换
+  //   - 面板显隐：editShowMode 同帧切换（避免离场淡出与占位）
+  //   - 第一次切到递增：editProgMounted=true（之后常驻）
+  //   - 数据迁移：本模式刚填的内容回压到下一行/下一字段时清理，避免脏数据
+  switchEditExMode(e) {
+    const m = e.currentTarget.dataset.m;
+    if (m !== 'fixed' && m !== 'prog') return;
+    if (m === this.data.editLoadMode) return;
+    const patch = {};
+    // 固定 → 递增：从旧三字段反推一组递增行（如有重量），避免来回切丢劳动
+    if (this.data.editLoadMode === 'fixed' && m === 'prog') {
+      const wt = String(this.data.editExWt || '').trim();
+      const sets = String(this.data.editExSets || '').trim();
+      const reps = String(this.data.editExReps || '').trim();
+      if (wt || sets || reps) {
+        const wp = parseFloat(wt), sp = parseInt(sets, 10), rp = parseInt(reps, 10);
+        // 组数钳到 1-6；固定模式没有「逐组」概念，这里只在用户给了完整三字段时构造一行
+        if (isFinite(wp) && wp > 0 && isFinite(sp) && sp >= 1 && sp <= 6 && isFinite(rp) && rp > 0) {
+          const rows = [];
+          for (let k = 0; k < sp; k++) {
+            rows.push({ wt: (k === sp - 1 ? String(wp + 5) : (k === 0 ? String(wp) : String(Math.round((wp + (wp + 5)) / 2)))), reps: String(rp) });
+          }
+          patch.editProgRows = rows;
+          patch.editProgSets = String(sp);
+        }
+      }
+      patch.editProgMounted = true; // 递增面板首次挂载（此后常驻，仅显隐）
+    }
+    patch.editLoadMode = m;
+    patch.editShowMode = m;
+    // 清空另一面板的字段：避免下次切回去看到「旧的」残留数字
+    if (m === 'prog') {
+      patch.editExWt = ''; patch.editExSets = ''; patch.editExReps = '';
+    } else {
+      // 不清空递增表单中的用户编辑内容
+    }
+    this.setData(patch);
+  },
+  // 强度 chip 选择：1-5；点击同一档切回到 0（取消）
+  setEditExIntensity(e) {
+    const v = parseInt(e.currentTarget.dataset.v, 10);
+    if (!(v >= 1 && v <= 5)) return;
+    this.setData({ editExIntensity: this.data.editExIntensity === v ? 0 : v });
+  },
+  // 递增面板 - 组数：onChange 即时建/缩行，blur 再做非法值兜底
+  onEditExProgSets(e) {
+    const v = e.detail.value;
+    const patch = { editProgSets: v };
+    const raw = String(v == null ? '' : v).trim();
+    if (/^[1-6]$/.test(raw)) {
+      const n = parseInt(raw, 10);
+      if (n !== (this.data.editProgRows || []).length) patch.editProgRows = this.buildEditProgRows(n);
+    }
+    this.setData(patch);
+  },
+  onEditExProgSetsBlur() { this.syncEditProgSetsRows(true); },
+  syncEditProgSetsRows(tip) {
+    const raw = String(this.data.editProgSets == null ? '' : this.data.editProgSets).trim();
+    const n = parseInt(raw, 10);
+    const cur = (this.data.editProgRows || []).length;
+    if (n >= 1 && n <= 6) {
+      if (n !== cur) this.setData({ editProgRows: this.buildEditProgRows(n) });
+      return;
+    }
+    if (raw !== '') {
+      const c = n > 6 ? 6 : 1;
+      if (tip) this.toast('递增组数需在 1-6 之间，已按 ' + c + ' 组处理');
+      this.setData({ editProgSets: String(c), editProgRows: this.buildEditProgRows(c) });
+      return;
+    }
+    this.setData({ editProgSets: String(cur || 3) });
+  },
+  onEditExProgWt(e) { this.setEditProgCell(parseInt(e.currentTarget.dataset.i, 10), e.detail.value, null); },
+  onEditExProgReps(e) { this.setEditProgCell(parseInt(e.currentTarget.dataset.i, 10), null, e.detail.value); },
+  // 按 key path 只更新目标行字段，避免整表替换导致其余行 input 重渲染
+  setEditProgCell(i, wt, reps) {
+    if (!this.data.editProgRows || !this.data.editProgRows[i]) return;
+    const patch = {};
+    if (wt != null) patch['editProgRows[' + i + '].wt'] = wt;
+    if (reps != null) patch['editProgRows[' + i + '].reps'] = reps;
+    this.setData(patch);
+  },
+  // 按 n 组构造逐组行：保留已有行已填值（前 n 行截断 / 不足补空行）
+  buildEditProgRows(n) {
+    const old = this.data.editProgRows || [];
+    const rows = [];
+    for (let k = 0; k < n; k++) {
+      const o = old[k];
+      rows.push(o ? { wt: String(o.wt == null ? '' : o.wt), reps: String(o.reps == null ? '' : o.reps) } : { wt: '', reps: '' });
+    }
+    return rows;
+  },
+  // 取消编辑现有动作：仅重置表单，UI 列表不修改
+  cancelEditEx() {
+    this.resetEditExForm();
+    this.toast('已取消编辑');
+  },
   addEditEx() {
     const dateStr = this.data.editDate;
     if (!dateStr) return;
     const name = (this.data.editExName || '').trim();
     if (!name) { this.toast('请输入动作名称'); return; }
-    const meta = (this.data.editExMeta || '').trim();
+    // 与主页 addEx 完全同口径：根据 exLoadMode 走 buildExMeta 或 buildProgMetaFromRows
+    let meta = '';
+    if (this.data.editLoadMode === 'prog') {
+      // 组数框可能处于未失焦的中间态，先规范化再取行
+      this.syncEditProgSetsRows(false);
+      const r = this.buildProgMetaFromRows(this.data.editProgRows);
+      if (!r.ok) { this.toast(r.err); return; }
+      meta = r.meta;
+    } else {
+      // 固定面板：重量/组数/次数 均可留空（也可只填部分），通过 buildExMeta 自由拼接
+      meta = this.buildExMeta(this.data.editExWt, this.data.editExSets, this.data.editExReps);
+    }
     this.ensureEditDay(dateStr);
     const h = this.state.history[dateStr];
     if (!Array.isArray(h.exNames)) h.exNames = [];
     if (!Array.isArray(h.exMeta)) h.exMeta = [];
-    // 名称校验：递增方案（包含→）或新格式含 '*' 的不强制要 meta（允许先填名再补 meta）
+    if (!Array.isArray(h.exIntensity)) h.exIntensity = [];
+    const editIdx = this.data.editExIndex;
+    // 更新现有动作（editExIndex>=0）
+    if (editIdx >= 0 && h.exNames[editIdx] !== undefined) {
+      const oldName = h.exNames[editIdx];
+      // 改名时校验是否撞到其他动作
+      if (oldName !== name && h.exNames.indexOf(name) >= 0) { this.toast('该动作名称已存在'); return; }
+      h.exNames[editIdx] = name;
+      h.exMeta[editIdx] = meta || '';
+      // 强度按 idx 写回；exIntensity 长度可能落后（补录旧动作），按需 expand
+      while (h.exIntensity.length < h.exNames.length) h.exIntensity.push(0);
+      h.exIntensity[editIdx] = this.data.editExIntensity || 0;
+      if (meta) h.trained = 1;
+      this.recalcEditDayBurn(dateStr);
+      this.saveState();
+      this.refreshAfterEditDay(dateStr);
+      this.resetEditExForm();
+      this.toast('已保存: ' + name + (meta ? ' ' + meta : '') + (this.data.editExIntensity ? ' · 强度' + this.data.editExIntensity : ''));
+      return;
+    }
+    // 新增模式：名称唯一性校验
     if (h.exNames.indexOf(name) >= 0) { this.toast('该动作已存在，可在原行点改/删'); return; }
     h.exNames.push(name);
-    h.exMeta.push(meta);
+    h.exMeta.push(meta || '');
+    h.exIntensity.push(this.data.editExIntensity || 0);
     h.trained = 1; // 添加动作即视为这一天训练过（与 recordTodayToHistory 行为一致）
     this.recalcEditDayBurn(dateStr);
-    this.setData({ editExName: '', editExMeta: '' });
+    this.resetEditExForm();
     this.saveState();
     this.refreshAfterEditDay(dateStr);
-    this.toast('已添加: ' + name + (meta ? ' ' + meta : ''));
+    this.toast('已添加: ' + name + (meta ? ' ' + meta : '') + (this.data.editExIntensity ? ' · 强度' + this.data.editExIntensity : ''));
   },
   removeEditEx(e) {
     const dateStr = this.data.editDate;
@@ -2277,6 +2437,8 @@ Page({
     const idx = e.currentTarget.dataset.i;
     const h = this.state.history[dateStr];
     if (!h || !h.exNames || !h.exNames[idx]) return;
+    // 当前若正在编辑这一条，先退出编辑态，避免 splice 后 editExIndex 越界
+    if (this.data.editExIndex === idx) this.resetEditExForm();
     const removed = h.exNames[idx];
     wx.showModal({
       title: '删除动作',
@@ -2290,6 +2452,7 @@ Page({
         if (!hh || !hh.exNames || !hh.exNames[idx]) return;
         hh.exNames.splice(idx, 1);
         hh.exMeta.splice(idx, 1);
+        if (Array.isArray(hh.exIntensity)) hh.exIntensity.splice(idx, 1);
         if (hh.exNames.length === 0) hh.trained = 0;
         this.recalcEditDayBurn(dateStr);
         this.saveState();
@@ -2298,6 +2461,56 @@ Page({
       }
     });
   },
+  // 把现有动作回填到表单（识别递增 → 切到递增面板并填入逐组行；固定时按 parseExMeta 拆分填三字段）
+  changeEditEx(e) {
+    const dateStr = this.data.editDate;
+    if (!dateStr) return;
+    const idx = e.currentTarget.dataset.i;
+    const h = this.state.history[dateStr];
+    if (!h || !h.exNames || !h.exNames[idx]) return;
+    const curName = h.exNames[idx];
+    const curMeta = h.exMeta[idx] || '';
+    const curIntensity = (h.exIntensity && h.exIntensity[idx]) || 0;
+    const patch = {
+      editExName: curName,
+      editExMeta: curMeta,
+      editExIntensity: curIntensity,
+      editExIndex: idx,
+      // 先重置面板数据，再依 meta 形态分别注入
+      editExWt: '', editExSets: '', editExReps: '',
+      editProgSets: '3',
+      editProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+      editLoadMode: 'fixed', editShowMode: 'fixed', editProgMounted: false
+    };
+    // 识别递增：含 →；否则视为固定面板
+    if (curMeta.indexOf('→') >= 0) {
+      const prog = this.parseProgSets(curMeta);
+      if (prog.length >= 2) {
+        patch.editLoadMode = 'prog';
+        patch.editShowMode = 'prog';
+        patch.editProgMounted = true;
+        patch.editProgSets = String(prog.length);
+        patch.editProgRows = prog.map(g => ({ wt: String(g.kg), reps: String(g.reps) }));
+      }
+    } else {
+      // 固定面板：尝试拆重量/组数/次数（解析失败则保持空，让用户重填）
+      const p = this.parseExMeta(curMeta);
+      if (p && p.weight) patch.editExWt = String(p.weight);
+      // 组数：固定格式才能可靠取；递增等只能让用户重填
+      const sm = /(\d+)\s*组\s*\*\s*([\d+]+)/.exec(curMeta);
+      if (sm) patch.editExSets = String(parseInt(sm[1], 10) || '');
+      const parts = sm ? sm[2].split('+') : null;
+      if (parts && parts.length) patch.editExReps = String(parseInt(parts[0], 10) || '');
+      else if (p && p.topReps) patch.editExReps = String(p.topReps);
+    }
+    // 强制切到 力量 tab，确保用户看到表单变更
+    patch.editActiveTab = 'str';
+    this.setData(patch);
+    this.toast('已载入，可修改后点「保存修改」');
+  },
+  // 行级 metadata 编辑（旧 showModal 路径，保留作为独立的 fallback）
+  // 新版 WXML 已统一改绑 changeEditEx（面板内编辑）。本函数维持原有行为，
+  // 方便单行轻量修改快捷通过；同时也是对历史调用点的兼容。
   changeEditExMeta(e) {
     const dateStr = this.data.editDate;
     if (!dateStr) return;
@@ -2334,10 +2547,11 @@ Page({
       confirmColor: '#c44',
       success: r => {
         if (!r.confirm) return;
-        // 重建空日记录
-        this.state.history[dateStr] = { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
+        // 用 emptyHistoryDay 重建（含 exIntensity: [] 兜底），避免漏字段触发后续 undefined 报错
+        this.state.history[dateStr] = this.emptyHistoryDay();
         this.saveState();
         this.refreshAfterEditDay(dateStr);
+        this.resetEditExForm();
         this.closeOverlay();
         this.toast('已清空 ' + dateStr);
       }
@@ -2353,6 +2567,8 @@ Page({
     if (h.trained == null) h.trained = 0;
     if (!Array.isArray(h.exNames)) h.exNames = [];
     if (!Array.isArray(h.exMeta)) h.exMeta = [];
+    // exIntensity 是新加的并行数组，旧日记录可能缺，访问前确保 Array(可空)，UI 层按 idx || 0 兜底
+    if (!Array.isArray(h.exIntensity)) h.exIntensity = [];
     if (!Array.isArray(h.cardio)) h.cardio = [];
     if (!Array.isArray(h.supps)) h.supps = [];
     if (!h.meals || typeof h.meals !== 'object') h.meals = { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } };
@@ -2363,7 +2579,13 @@ Page({
   },
   // 把 h 中的各类转换成 UI 用的渲染列表（含索引 i 用于操作）
   collectEditDayLists(h) {
-    const exList = (h.exNames || []).map((n, i) => ({ name: n, meta: h.exMeta[i] || '', i: i }));
+    const exIntensity = (h && Array.isArray(h.exIntensity)) ? h.exIntensity : [];
+    const exList = (h.exNames || []).map((n, i) => ({
+      name: n,
+      meta: (h.exMeta || [])[i] || '',
+      intensity: exIntensity[i] || 0,
+      i: i
+    }));
     const cardioList = (h.cardio || []).map((c, i) => ({
       name: c.name || '',
       dur: c.dur || 0,
@@ -2481,6 +2703,10 @@ Page({
       editSuppsList: lists.suppsList,
       editMealsObject: lists.mealsObj,
       editExName: '', editExMeta: '',
+      editExWt: '', editExSets: '', editExReps: '',
+      editLoadMode: 'fixed', editShowMode: 'fixed', editProgMounted: false,
+      editProgSets: '3', editProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
+      editExIntensity: 0, editExIndex: -1,
       editCardioName: '', editCardioDur: '', editCardioBurn: '',
       editSuppName: '', editSuppUnit: '', editSuppDose: '', editSuppDone: false,
       editMealName: '', editMealSub: '约100g', editMealCal: '',
