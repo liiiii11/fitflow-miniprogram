@@ -668,14 +668,11 @@
             <view style="font-size:11px;color:var(--muted);margin-top:6px">例：第1组 60×12、第2组 70×10、第3组 80×8；整行为空自动跳过</view>
           </view>
 
-          <!-- 强度 5 档（每动作；旧 RPE 是每日整体，不冲突） -->
+          <!-- 强度 RPE（与主页完全一致：1-10 数字、5列网格、珊瑚填充） -->
           <view style="margin-top:4px">
-            <text class="fg__lbl">强度（每动作；选填）</text>
-            <view class="edit-rpe-pick">
-              <view wx:for="{{editIntensityChips}}" wx:key="*this" class="edit-rpe-pick__i {{editExIntensity===item?'on':''}}" data-v="{{item}}" bindtap="setEditExIntensity">
-                <text style="font-size:14px;font-weight:600">{{item}}</text>
-                <text class="edit-rpe-pick__lbl">{{editIntensityLabels[index]}}</text>
-              </view>
+            <text class="fg__lbl">强度 RPE（每动作；选填）</text>
+            <view class="rpe-pick">
+              <view wx:for="{{editIntensityChips}}" wx:key="*this" class="rpe-pick__i {{editExIntensity===item?'on':''}}" data-v="{{item}}" bindtap="setEditExIntensity">{{item}}</view>
             </view>
           </view>
 

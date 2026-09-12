@@ -170,9 +170,8 @@ Page({
     editExWt: '', editExSets: '', editExReps: '',
     editLoadMode: 'fixed', editShowMode: 'fixed', editProgMounted: false,
     editProgSets: '3', editProgRows: [{ wt: '', reps: '' }, { wt: '', reps: '' }, { wt: '', reps: '' }],
-    // 补录 - 力量 tab：每动作自感强度（0 未选 / 1-5）
-    editIntensityChips: [1, 2, 3, 4, 5],
-    editIntensityLabels: ['轻松', '适中', '较累', '费力', '极限'],
+    // 补录 - 力量 tab：每动作自感强度 RPE（0 未选 / 1-10，与主页 RPE 同款）
+    editIntensityChips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     editExIntensity: 0,
     // 补录 - 力量 tab：编辑现有动作模式 (-1 = 新增；>=0 = 该 idx 进入 update 分支)
     editExIndex: -1,
@@ -2322,7 +2321,7 @@ Page({
   // 强度 chip 选择：1-5；点击同一档切回到 0（取消）
   setEditExIntensity(e) {
     const v = parseInt(e.currentTarget.dataset.v, 10);
-    if (!(v >= 1 && v <= 5)) return;
+    if (!(v >= 1 && v <= 10)) return;
     this.setData({ editExIntensity: this.data.editExIntensity === v ? 0 : v });
   },
   // 递增面板 - 组数：onChange 即时建/缩行，blur 再做非法值兜底

@@ -221,13 +221,6 @@
 .edit-meal-pill.on { color: var(--text); background: rgba(212,120,92,.12); font-weight: 600; }
 .edit-supp-check { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--rule); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--accent); flex-shrink: 0; }
 .edit-supp-check.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-/* 补录 - 力量 tab：每动作自感强度 chip（5 档，比全局 RPE 更粗） */
-.edit-rpe-pick { display: flex; gap: 6px; margin-top: 8px; }
-.edit-rpe-pick__i { flex: 1; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; border-radius: 10px; border: 1px solid var(--rule); color: var(--muted); transition: all .15s; }
-.edit-rpe-pick__i.on { border-color: var(--accent); background: rgba(212,120,92,.10); color: var(--accent); font-weight: 600; }
-.edit-rpe-pick__i.on text:first-child { color: var(--accent); }
-.edit-rpe-pick__lbl { font-size: 10px; color: var(--muted); line-height: 1; }
-.edit-rpe-pick__i.on .edit-rpe-pick__lbl { color: var(--accent); }
 /* 补录 - 力量 tab：动作行内的强度小数字徽章（如 3） */
 .edit-ex-rpe-badge { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(212,120,92,.10); padding: 1px 7px; border-radius: 9px; flex-shrink: 0; line-height: 1.4; }
 .heat-sq { width: 10px; height: 10px; border-radius: 2px; }
