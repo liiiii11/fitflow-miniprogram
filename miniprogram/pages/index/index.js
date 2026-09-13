@@ -327,7 +327,6 @@ Page({
     // 只做有氧（未做力量）也必须记为训练日：trained 只看力量动作会导致
     // 有氧日的热力图/周月统计/连续天数/成长分析全部漏记
     h.trained = (completedExs.length > 0 || doneCardio.length > 0) ? 1 : 0;
-    h.burn = this.estimateBurn(completedExs) + this.getCardioBurn();
     // 重建今日力量动作：主页勾选态为基准；同时按名保留「补录-today 但不在主页」的动作，
     // 并同步 exIntensity（按名对齐）。否则补录-today 的动作会被整体覆盖丢失，且 exIntensity
     // 与 exNames 长度错位、强度映射到错误动作（训练报告 e1RM/肌肉组数随之失真）。
@@ -346,12 +345,36 @@ Page({
     h.exNames = baseNames.concat(extraNames);
     h.exMeta = baseMeta.concat(extraMeta);
     h.exIntensity = baseNames.map(n => (n in oldIntensityByName ? oldIntensityByName[n] : 0)).concat(extraIntensity);
-    h.intake = this.getTotalIntake();
+
+    // 四类统一 schema：写入今天的有氧 / 饮食 / 补剂明细（供历史格子补录对齐）。
+    // 与力量同策略：主页勾选态为基准，按名保留「补录-today 但不在主页」的明细，
+    // 否则补录-today 的有氧/餐食/补剂会被整体覆盖丢失（热力图颜色、今日消耗/摄入数字都不含它们）。
+    const baseCardioSet = {}; doneCardio.forEach(c => { baseCardioSet[c.name] = true; });
+    const extraCardio = (h.cardio || []).filter(c => !baseCardioSet[c.name]);
+    h.cardio = doneCardio.map(c => ({ name: c.name, dur: c.dur, burn: c.burn, meta: c.meta || '' })).concat(extraCardio);
+    const extraCardioBurn = extraCardio.reduce((s, c) => s + (isFinite(c.burn) ? c.burn : 0), 0);
+
+    const baseSuppSet = {}; (this.state.supps || []).forEach(s => { baseSuppSet[s.name] = true; });
+    const extraSupp = (h.supps || []).filter(s => !baseSuppSet[s.name]);
+    h.supps = (this.state.supps || []).map(s => ({ name: s.name, unit: s.unit, dose: s.dose, done: !!s.done })).concat(extraSupp);
+
+    const mergeMealItems = (type) => {
+      const base = (((this.state.meals && this.state.meals[type]) && this.state.meals[type].items) || []);
+      const baseSet = {}; base.forEach(x => { baseSet[x.name] = true; });
+      const extra = (((h.meals && h.meals[type]) && h.meals[type].items) || []).filter(x => !baseSet[x.name]);
+      return { items: base.map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })).concat(extra) };
+    };
+    h.meals = { breakfast: mergeMealItems('breakfast'), lunch: mergeMealItems('lunch'), dinner: mergeMealItems('dinner'), snack: mergeMealItems('snack') };
+
+    // 消耗：主页力量 + 主页有氧 + 补录-only 有氧（getCardioBurn 只含主页有氧，需补 extraCardioBurn）
+    h.burn = this.estimateBurn(completedExs) + this.getCardioBurn() + extraCardioBurn;
+    // 摄入：从合并后的 meals（含补录-only 餐）累加，避免补录-today 的餐不计入 intake
+    let mergedIntake = 0;
+    ['breakfast', 'lunch', 'dinner', 'snack'].forEach(k => {
+      ((h.meals[k] && h.meals[k].items) || []).forEach(x => { mergedIntake += isFinite(x.cal) ? x.cal : 0; });
+    });
+    h.intake = mergedIntake;
     h.water = this.state.water * CUP_ML;
-    // 四类统一 schema：写入今天的有氧 / 饮食 / 补剂明细（供历史格子补录对齐）
-    h.cardio = doneCardio.map(c => ({ name: c.name, dur: c.dur, burn: c.burn, meta: c.meta || '' }));
-    h.supps = (this.state.supps || []).map(s => ({ name: s.name, unit: s.unit, dose: s.dose, done: !!s.done }));
-    h.meals = { breakfast: { items: ((this.state.meals.breakfast && this.state.meals.breakfast.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, lunch: { items: ((this.state.meals.lunch && this.state.meals.lunch.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, dinner: { items: ((this.state.meals.dinner && this.state.meals.dinner.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) }, snack: { items: ((this.state.meals.snack && this.state.meals.snack.items) || []).map(x => ({ name: x.name, sub: x.sub || '', cal: x.cal })) } };
     const plan = this.getAllPlans().find(p => p.id === this.state.currentPlanId);
     if (plan && plan.days) {
       // 记录实际练过的训练日名（跨日切换后不丢）；没练则记当前查看的训练日
