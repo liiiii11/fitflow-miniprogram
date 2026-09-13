@@ -324,9 +324,13 @@ Page({
     const h = this.state.history[today];
     const completedExs = this.getCompletedExercises();
     const doneCardio = (this.state.cardio || []).filter(c => c.done);
-    // 只做有氧（未做力量）也必须记为训练日：trained 只看力量动作会导致
-    // 有氧日的热力图/周月统计/连续天数/成长分析全部漏记
-    h.trained = (completedExs.length > 0 || doneCardio.length > 0) ? 1 : 0;
+    const hasCurrentDone = completedExs.length > 0 || doneCardio.length > 0;
+    // 跨计划切换保护：当天已按旧计划练过（h.trained=1 且 h.planId 与当前计划不同）后，
+    // 中途切到新计划（新计划无 done 动作→completedExs 为空）时，不要把已练日整体清零、
+    // 也不把训练日名误标成新计划日；只有「同一计划下取消勾选」才应把今天重置为未练。
+    const prevTrained = h.trained;
+    const prevPlanId = h.planId;
+    h.trained = hasCurrentDone ? 1 : (prevTrained && prevPlanId === this.state.currentPlanId ? 0 : (prevTrained ? 1 : 0));
     // 重建今日力量动作：主页勾选态为基准；同时按名保留「补录-today 但不在主页」的动作，
     // 并同步 exIntensity（按名对齐）。否则补录-today 的动作会被整体覆盖丢失，且 exIntensity
     // 与 exNames 长度错位、强度映射到错误动作（训练报告 e1RM/肌肉组数随之失真）。
@@ -342,9 +346,15 @@ Page({
     oldNames.forEach((n, i) => {
       if (!baseNameSet[n]) { extraNames.push(n); extraMeta.push(oldMeta[i] || ''); extraIntensity.push(oldIntensity[i] || 0); }
     });
-    h.exNames = baseNames.concat(extraNames);
-    h.exMeta = baseMeta.concat(extraMeta);
-    h.exIntensity = baseNames.map(n => (n in oldIntensityByName ? oldIntensityByName[n] : 0)).concat(extraIntensity);
+    // 同计划下今天无任何完成动作（取消勾选/纯未练）→ 清空力量动作，避免残留旧动作；
+    // 跨计划切换（旧计划已练）则保留补录/旧计划动作，不把已练日清零
+    if (!hasCurrentDone && prevPlanId === this.state.currentPlanId) {
+      h.exNames = []; h.exMeta = []; h.exIntensity = [];
+    } else {
+      h.exNames = baseNames.concat(extraNames);
+      h.exMeta = baseMeta.concat(extraMeta);
+      h.exIntensity = baseNames.map(n => (n in oldIntensityByName ? oldIntensityByName[n] : 0)).concat(extraIntensity);
+    }
 
     // 四类统一 schema：写入今天的有氧 / 饮食 / 补剂明细（供历史格子补录对齐）。
     // 与力量同策略：主页勾选态为基准，按名保留「补录-today 但不在主页」的明细，
@@ -384,7 +394,8 @@ Page({
       });
       const day = plan.days[this.state.currentDayIdx % plan.days.length];
       h.planId = this.state.currentPlanId;
-      h.dayName = trainedDayName || (day ? day.name : '');
+      // 保留已练日的训练日名：跨计划切换后不丢；同计划未练则记当前查看的训练日
+      h.dayName = trainedDayName || h.dayName || (day ? day.name : '');
     }
   },
   // 历史记录每天的标准空骨架（schema 与 recordTodayToHistory 对齐，便于补录写任意日期）
@@ -3214,7 +3225,10 @@ Page({
       const mNames = h.exNames || [], mMetas = h.exMeta || [];
       for (let j = 0; j < mNames.length; j++) {
         const mg = this.matchMuscle(mNames[j]);
-        if (!mg || mg.key === 'cardio') continue; // 有氧不计入部位组数（容量区块已覆盖）
+        if (!mg || mg.key === 'cardio') continue; // 有氧不计入部位组数（容量仅计力量吨量）
+        // 双保险：有氧名即使用了非标准命名（未命中 cardio 关键词却含力量词），
+        // 只要当天也作为有氧明细记录过，就排除，避免污染肌群组数统计
+        if (h.cardio && h.cardio.some(c => c.name === mNames[j])) continue;
         // 没记组数按 1 组保守计入；自重动作按 meta 里的组数记
         muscleSets[mg.key] = (muscleSets[mg.key] || 0) + this.countSets(mMetas[j]);
       }
