@@ -328,8 +328,24 @@ Page({
     // 有氧日的热力图/周月统计/连续天数/成长分析全部漏记
     h.trained = (completedExs.length > 0 || doneCardio.length > 0) ? 1 : 0;
     h.burn = this.estimateBurn(completedExs) + this.getCardioBurn();
-    h.exNames = completedExs.map(e => e.name).concat(doneCardio.map(c => c.name));
-    h.exMeta = completedExs.map(e => e.meta || '').concat(doneCardio.map(c => c.meta || ''));
+    // 重建今日力量动作：主页勾选态为基准；同时按名保留「补录-today 但不在主页」的动作，
+    // 并同步 exIntensity（按名对齐）。否则补录-today 的动作会被整体覆盖丢失，且 exIntensity
+    // 与 exNames 长度错位、强度映射到错误动作（训练报告 e1RM/肌肉组数随之失真）。
+    const baseNames = completedExs.map(e => e.name).concat(doneCardio.map(c => c.name));
+    const baseMeta = completedExs.map(e => e.meta || '').concat(doneCardio.map(c => c.meta || ''));
+    const oldNames = h.exNames || [];
+    const oldMeta = h.exMeta || [];
+    const oldIntensity = Array.isArray(h.exIntensity) ? h.exIntensity : [];
+    const oldIntensityByName = {};
+    oldNames.forEach((n, i) => { if (!(n in oldIntensityByName)) oldIntensityByName[n] = oldIntensity[i] || 0; });
+    const baseNameSet = {}; baseNames.forEach(n => baseNameSet[n] = true);
+    const extraNames = [], extraMeta = [], extraIntensity = [];
+    oldNames.forEach((n, i) => {
+      if (!baseNameSet[n]) { extraNames.push(n); extraMeta.push(oldMeta[i] || ''); extraIntensity.push(oldIntensity[i] || 0); }
+    });
+    h.exNames = baseNames.concat(extraNames);
+    h.exMeta = baseMeta.concat(extraMeta);
+    h.exIntensity = baseNames.map(n => (n in oldIntensityByName ? oldIntensityByName[n] : 0)).concat(extraIntensity);
     h.intake = this.getTotalIntake();
     h.water = this.state.water * CUP_ML;
     // 四类统一 schema：写入今天的有氧 / 饮食 / 补剂明细（供历史格子补录对齐）
@@ -350,7 +366,7 @@ Page({
   },
   // 历史记录每天的标准空骨架（schema 与 recordTodayToHistory 对齐，便于补录写任意日期）
   emptyHistoryDay() {
-    // exIntensity：每动作的 5 档自感强度（0 未选 / 1 轻松 / 2 适中 / 3 较累 / 4 费力 / 5 极限），
+    // exIntensity：每动作的自感强度 RPE（0 未选 / 1-10，与主页 RPE 同款），
     // 与 exNames/exMeta 同长度并行存在；旧数据无该字段时 ensureEditDay 兜底补 []
     return { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [], exIntensity: [], cardio: [], supps: [], meals: { breakfast: { items: [] }, lunch: { items: [] }, dinner: { items: [] }, snack: { items: [] } } };
   },
@@ -2236,32 +2252,6 @@ Page({
       heatmap: cells
     });
   },
-  openEditDay(e) {
-    const dateStr = e.currentTarget.dataset.ds;
-    if (!dateStr) return;
-    // 未来日期格子（当月今天之后的占位）不可编辑：直接忽略，避免弹出误导
-    if (dateStr > todayKey()) return;
-    const parts = dateStr.split('-');
-    const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
-    const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    const isToday = dateStr === todayKey();
-    const agoDays = isToday ? 0 : Math.round((Date.now() - new Date(y, m, d).getTime()) / 86400000);
-    const title = MONTH_CN[m] + d + '日 ' + dayNames[new Date(y, m, d).getDay()] + (agoDays > 0 ? ' (距今 ' + agoDays + ' 天)' : ' · 今日');
-    const h = this.state.history[dateStr] || { trained: 0, burn: 0, intake: 0, water: 0, planId: '', dayName: '', exNames: [], exMeta: [] };
-    // 摘要行：日期 + 部位 + 消耗 + 摄入 + 饮水 + RPE（合并原有 showHeatDetail 详情）
-    const summary = [];
-    summary.push({ k: '训练部位', v: h.dayName || (h.trained ? '训练日' : '休息日') });
-    summary.push({ k: '消耗', v: (h.burn || 0) + ' kcal' });
-    summary.push({ k: '摄入', v: (h.intake || 0) + ' kcal' });
-    summary.push({ k: '饮水', v: (h.water || 0) + ' ml' });
-    if (h.rpe) summary.push({ k: '自感强度 RPE', v: h.rpe + ' / 10 · ' + this.rpeWord(h.rpe) });
-    const exNames = h.exNames || [];
-    const exMetas = h.exMeta || [];
-    // 动作明细编辑视图（每行：name + meta + 操作）
-    const exList = exNames.map((n, i) => ({ name: n, meta: exMetas[i] || '', i: i }));
-    this.setData({ editDate: dateStr, editDaySummary: summary, editExList: exList, editExName: '', editExMeta: '', heatDetailTitle: title, heatDetailBody: summary });
-    this.openModal('heatDetail');
-  },
   onEditExName(e) { this.setData({ editExName: e.detail.value }); },
   // 编辑回填或新增后清空时使用：把力量 tab 表单字段统一重置为默认。
   // 固定/递增切换标志、强度、editExIndex 一并清零，确保下次进入是真正的「新增」状态。
@@ -2709,6 +2699,7 @@ Page({
       editCardioName: '', editCardioDur: '', editCardioBurn: '',
       editSuppName: '', editSuppUnit: '', editSuppDose: '', editSuppDone: false,
       editMealName: '', editMealSub: '约100g', editMealCal: '',
+      editMealType: 'breakfast',
       editActiveTab: initialTab,
       heatDetailTitle: title,
       heatDetailBody: summary
